@@ -1873,6 +1873,8 @@ const LanguageSettings = createFactory({
     //}, {
       //value: 'he_IL', label: "Hebrew"
     }, {
+      value: 'lv_LV', label: "Latvian"
+    }, {
       value: 'pl_PL', label: "Polish"
     }, {
       value: 'pt_BR', label: "Portuguese (Brazilian)"

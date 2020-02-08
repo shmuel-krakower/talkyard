@@ -100,6 +100,7 @@ var t_en_US: TalkyardTranslations = t = {
   SavedDot: "Saglabāts.",
   Search: "Meklēt",
   SendMsg: "Sūtīt ziņu",
+  ShowPreview: "Show preview",  // MISSING
   SignUp: "Reģistrēties",
   Solution: "Risinājums",
   started: "uzsākts",
@@ -566,6 +567,20 @@ var t_en_US: TalkyardTranslations = t = {
 
     repliesTo: "atbildes uz",
     InReplyTo: "Atbildē uz",
+    YourReplyTo: "Your reply to ",  // MISSING
+    YourChatMsg: "Your chat message: ",   // MISSING
+    YourDraft: "Your draft",    // MISSING
+    YourEdits: "Your edits: ",   // MISSING
+    YourProgrNoteC: "Your progress note:",  // MISSING
+    aProgrNote: "a progress note: ",  // MISSING
+
+    ReplyingToC: "Replying to:",    // MISSING
+    ScrollToPrevw_1: "Scroll to ",  // MISSING
+    ScrollToPrevw_2: "preview",     // MISSING
+
+    UnfinEdits: "Unfinished edits",  // MISSING
+    ResumeEdting: "Resume editing",  // MISSING
+    DelDraft: "Delete draft",   // MISSING
 
     ClickViewEdits: "Klikšķini, lai skatītu vecos labojumus",
 
@@ -831,7 +846,7 @@ var t_en_US: TalkyardTranslations = t = {
     SendAnInv: "Uzaicināt cilvēkus", // was: "Send an Invite",   MISSING I18N all other langs
     SendInv: "Sūtīt uzaicinājumus",   // MISSING I18N is just "Send invite" (singularis) in all other langs
     SendInvExpl:  // MISSING I18N changed to pluralis
-        Mēs nosūtīsim taviem draugiem īsu vēstuli, un viņiem būs jānoklikšķina uz saites " +
+        "Mēs nosūtīsim taviem draugiem īsu vēstuli, un viņiem būs jānoklikšķina uz saites " +
         "lai uzreiz pievienotos, bez ienākšanas. " +
         "Viņi kļūs par normāliem lietotājiem (un nevis moderatoriem vai admninistratoriem).",
     //EnterEmail: "Ievadīt epastu(s)",
@@ -1126,7 +1141,7 @@ var t_en_US: TalkyardTranslations = t = {
     PleaseWriteMsg: "Raksti ziņu.",
 
     exBold: "treknrakstā",
-    exEmph: "ar pasvītrojumu ,
+    exEmph: "ar pasvītrojumu",
     exPre: "iepriekš formatēts",
     exQuoted: "citēts",
     ExHeading: "Virsraksts",
@@ -1152,6 +1167,7 @@ var t_en_US: TalkyardTranslations = t = {
     ReplyTo: "Atbildēt uz ",
     ReplyTo_theOrigPost: "oriģinālais ieraksts",
     ReplyTo_post: "ieraksts ",
+    AddCommentC: "Add a comment:",   // MISSING
 
     PleaseSelectPosts: "Izvēlies vienu vai vairākus ierakstus, uz kuriem atbildēt.",
 
@@ -1207,7 +1223,8 @@ var t_en_US: TalkyardTranslations = t = {
 
     LoadingDraftDots: "Tiek atvērts melnraksts...",
     DraftUnchanged: "Bez izmaiņām.",
-    CannotSaveDraftC: "Nevar saglabāt melnrakstu.",
+    CannotSaveDraftC: "Nevar saglabāt melnrakstu:",
+    DraftSavedBrwsr: "Draft saved, in browser.",   // MISSING
     DraftSaved: (nr: string | number) => `Melnraksts ${nr} saglabāts.`,
     DraftDeleted: (nr: string | number) => `Melnraksts ${nr} izdzēsts.`,
     WillSaveDraft: (nr: string | number) => `Melnraksts ${nr} tiks saglabāts ...`,
