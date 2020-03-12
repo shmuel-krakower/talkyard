@@ -33,6 +33,9 @@ import scala.collection.mutable.ArrayBuffer
 case class SitePatcher(globals: debiki.Globals) {
 
 
+  // ======= Add to existing site
+
+
   def upsertIntoExistingSite(siteId: SiteId, siteData: SitePatch, browserIdData: BrowserIdData)
         : SitePatch = {
 
@@ -111,7 +114,7 @@ case class SitePatcher(globals: debiki.Globals) {
 
       SHOULD // check ok alt id  [05970KF5]
 
-      val pagesInDbByExtId: Map[ExtImpId, PageMeta] =
+      val pagesInDbByExtId: Map[ExtId, PageMeta] =
         tx.loadPageMetasByExtIdAsMap(siteData.pages.flatMap(_.extImpId))
 
       val pagesInDbByAltId: Map[AltPageId, PageMeta] =
@@ -240,7 +243,7 @@ case class SitePatcher(globals: debiki.Globals) {
       // If there're participants in the database with the same external ids
       // as some of those in the siteData, then, they are to be updated, and we
       // won't create new participants, for them.
-      val ppsInDbByExtId: Map[ExtImpId, ParticipantInclDetails] =
+      val ppsInDbByExtId: Map[ExtId, ParticipantInclDetails] =
         tx.loadParticipantsInclDetailsByExtIdsAsMap_wrongGuestEmailNotfPerf(ppsExtIds)
 
       val ppsWithRealIdsByTempImpId = mutable.HashMap[UserId, ParticipantInclDetails]()
@@ -324,6 +327,32 @@ case class SitePatcher(globals: debiki.Globals) {
         dieIf(upsertedGuestRealId.id <= -LowestTempImpId,
           "TyE305HKSD2", s"Guest id ${guestInPatch.id} got remapped to ${upsertedGuestRealId.id}")
         ppsWithRealIdsByTempImpId.put(guestInPatch.id, upsertedGuestRealId)
+      }
+
+
+      // ----- Page participants
+
+      // This currently happens only via /-/v0/upsert-simple. [UPSPAMEM]
+
+      siteData.pageParticipants foreach { pagePp =>
+        throwForbiddenIf(Participant.isGuestId(pagePp.userId),
+          "TyE5G2JKG057M", s"Cannot add guest ${pagePp.userId} to page")
+        throwForbiddenIf(Participant.isBuiltInParticipant(pagePp.userId),
+          "TyE5KRSJWQ66", s"Cannot add built-in participant ${pagePp.userId} to page")
+      }
+
+      siteData.pageParticipants.groupBy(_.pageId) foreach { pageIdAndPps =>
+        val pageId = pageIdAndPps._1
+        val pagePps = pageIdAndPps._2
+        val pagePpIds: Set[UserId] = tx.loadMessageMembers(pageId)
+        pagePps foreach { pageParticipant: PageParticipant =>
+          if (pagePpIds.contains(pageParticipant.userId)) {
+            // Don't add again. Later: Maybe update? Or remove if kickedAt defined.
+          }
+          else {
+            tx.insertPageParticipant(pageParticipant)
+          }
+        }
       }
 
 
@@ -494,6 +523,8 @@ case class SitePatcher(globals: debiki.Globals) {
             tx.insertPost(postReal)
             wroteToDatabase = true
             pageIdsWithBadStats.add(postReal.pageId)
+
+            // MISSING:  addUserStats(stats)(tx)
 
             // Full-text-search index this new post.
             TESTS_MISSING // this test: [2WBKP05] commented out, assumes isn't indexed.
@@ -917,6 +948,9 @@ case class SitePatcher(globals: debiki.Globals) {
       pagePaths = (upsertedPagePaths ++ sectionPagePaths).distinct,
       categories = upsertedCategories.toVector)
   }
+
+
+  // ======= Create / restore site
 
 
   def importCreateSite(siteData: SitePatch, browserIdData: BrowserIdData,

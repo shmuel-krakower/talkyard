@@ -696,7 +696,7 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
 
 
 
-    def createSiteWithOneCatPageMember(hostname: String, pageExtId: Option[ExtImpId] = None,
+    def createSiteWithOneCatPageMember(hostname: String, pageExtId: Option[ExtId] = None,
           pageDiscussionIds: Set[AltPageId] = Set.empty)
           : (Site, CreateForumResult, PageId, Seq[Post], User, User, SiteDao) = {
       val (site, dao) = createSite(hostname)
@@ -919,6 +919,8 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
           actualNewPage.lastApprovedReplyById mustBe Some(merlinMember.id)
           actualNewPage.frequentPosterIds mustBe Vector(merrylMember.id)
         }
+
+        TESTS_MISSING // user stats updated too? Num replies posted.
       }
 
 

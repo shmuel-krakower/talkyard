@@ -51,7 +51,7 @@ trait LoginSiteDaoMixin extends SiteTransaction {
 
   override def loginAsGuest(loginAttempt: GuestLoginAttempt): GuestLoginResult = {
       var userId = 0
-      var extImpId: Option[ExtImpId] = None
+      var extImpId: Option[ExtId] = None
       var emailNotfsStr = ""
       var createdAt: Option[When] = None
       var isNewGuest = false

@@ -171,7 +171,7 @@ case class NewPasswordUserData(
   isOwner: Boolean,
   isModerator: Boolean = false,
   emailVerifiedAt: Option[When] = None,
-  extId: Option[ExtImpId] = None,
+  extId: Option[ExtId] = None,
   trustLevel: TrustLevel = TrustLevel.NewMember,
   threatLevel: ThreatLevel = ThreatLevel.HopefullySafe) {
 
@@ -212,7 +212,7 @@ object NewPasswordUserData {
   def create(
         name: Option[String], username: String, email: String,
         password: Option[String] = None,
-        extId: Option[ExtImpId] = None,
+        extId: Option[ExtId] = None,
         externalId: Option[String] = None, // RENAME to ssoId   SECURITY validate?
         createdAt: When,
         isAdmin: Boolean, isOwner: Boolean, isModerator: Boolean = false,
@@ -790,7 +790,7 @@ case class ExternalUser(   // sync with test code [7KBA24Y]
   */
 case class Guest(   // [exp] ok
   id: UserId,
-  override val extImpId: Option[ExtImpId],
+  override val extImpId: Option[ExtId],
   createdAt: When,
   guestName: String,
   guestBrowserId: Option[String],
@@ -829,7 +829,7 @@ case class Guest(   // [exp] ok
 
 sealed trait ParticipantInclDetails {
   def id: UserId
-  def extImpId: Option[ExtImpId]
+  def extImpId: Option[ExtId]
   def createdAt: When
   def isBuiltIn: Boolean = Participant.isBuiltInPerson(id) || Participant.isBuiltInGroup(id)
   def noDetails: Participant
@@ -868,7 +868,7 @@ sealed trait MemberInclDetails extends ParticipantInclDetails {
 
 case class UserInclDetails(  // ok for export
   id: UserId,
-  extImpId: Option[ExtImpId] = None,  // RENAME to extId
+  extImpId: Option[ExtId] = None,  // RENAME to extId
   externalId: Option[String],   // RENAME to 'ssoId', + in API protocol too? [395KSH20], no, just ssoId?
   fullName: Option[String],
   username: String,
@@ -1237,7 +1237,7 @@ case class Group(  // [exp] missing: createdAt, add to MemberInclDetails & Parti
   id: UserId,
   theUsername: String,
   name: Option[String],
-  extImpId: Option[ExtImpId] = None,
+  extImpId: Option[ExtId] = None,
   createdAt: When = When.Genesis,  // for now
   // emailAddr: String  <— if adding later, don't forget to update this: [306KWUSSJ24]
   tinyAvatar: Option[UploadRef] = None,

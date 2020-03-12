@@ -71,13 +71,14 @@ case class SitePatchParser(context: EdContext) {
 
 
   private def parseSimpleSitePatch(siteId: SiteId, bodyJson: JsValue): SitePatch = {
-    val (categoriesJson, pagesJson, anyUpsertOptionsJson) =
+    val (categoriesJson, pagesJson, postJson, anyUpsertOptionsJson) =
       try { // (this extra try...catch is for better error messages)
         // Only categories.
         // Right now, all people have asked for, is to upsert categories
         // (via /-/v0/upsert-simple ).
         (readJsArray(bodyJson, "categories", optional = true),
           readJsArray(bodyJson, "pages", optional = true),
+          readJsArray(bodyJson, "posts", optional = true),
           readOptJsObject(bodyJson, "upsertOptions"))
       }
       catch {
@@ -103,6 +104,13 @@ case class SitePatchParser(context: EdContext) {
               index $index in the 'pages' list: $error, json: $json"""))
     }
 
+    val postPatches: Seq[SimplePostPatch] = postJson.value.zipWithIndex map { case (json, index) =>
+      readSimplePostPatchOrBad(json).getOrIfBad(error =>
+        throwBadReq(
+          "TyE5WKVJ025", o"""Invalid SimplePostPatch json at
+              index $index in the 'posts' list: $error, json: $json"""))
+    }
+
     val upsertOptions = anyUpsertOptionsJson map { json =>
       UpsertOptions(
         sendNotifications = readOptBool(json, "sendNotifications"))
@@ -111,7 +119,8 @@ case class SitePatchParser(context: EdContext) {
     val simplePatch = SimpleSitePatch(
       upsertOptions,
       categoryPatches,
-      pagePatches)
+      pagePatches,
+      postPatches)
 
     val dao = context.globals.siteDao(siteId)
     val completePatch = simplePatch.loadThingsAndMakeComplete(dao) match {
@@ -1063,7 +1072,7 @@ case class SitePatchParser(context: EdContext) {
         return Bad(s"Not a SimplePagePatch json object, but a: " + classNameOf(bad))
     }
 
-    // Try to not reject the request.
+    // Try to not reject the request. [0REJREQ]
     // E.g. truncate the title to MaxTitleLength instead of replying Error.
     // Because the software (and people) that calls this API, generally expects it
     // to do "as best it can", and wouldn't understand any server response error codes.
@@ -1071,16 +1080,27 @@ case class SitePatchParser(context: EdContext) {
     // ... Unless an upsertOptions is { strict: true }  (unimplemented).
 
     try {
+      val extId = readString(jsObj, "extId")
       val pageType = readOptInt(jsObj, "pageType") map { value =>
         PageType.fromInt(value).getOrThrowBadJson("pageType")
       }
+
+      val pageMemberRefs = readJsArray(jsValue, "pageMemberRefs", optional = true).value.map {
+        case JsString(ref) =>
+          parseRef(ref, allowParticipantRef = true) getOrIfBad { problem =>
+            return Bad(s"Bad page participant ref: '$ref', problem: $problem [TyE306WMTR6")
+          }
+        case v => return Bad(s"Page extId '$extId' has bad page member ref: $v  [TyE406KSTJ3]")
+      }.toVector
+
       Good(SimplePagePatch(
-        extId = readString(jsObj, "extId"),
+        extId = extId,
         pageType = pageType,
         categoryRef = Some(readString(jsObj, "categoryRef")),
         // Better require an author name — hard to *start* requiring it in the future,
         // but easy to *stop* requiring it.
         authorRef = Some(readString(jsObj, "authorRef")),
+        pageMemberRefs = pageMemberRefs,
         title = readString(jsObj, "title").take(MaxTitleLength),
         body = readString(jsObj, "body")))
     }
@@ -1350,6 +1370,46 @@ case class SitePatchParser(context: EdContext) {
     catch {
       case ex: IllegalArgumentException =>
         Bad(s"Bad json for post id '$id': ${ex.getMessage}")
+    }
+  }
+
+
+  def readSimplePostPatchOrBad(jsValue: JsValue): SimplePostPatch Or ErrorMessage = {
+    val jsObj = jsValue match {
+      case x: JsObject => x
+      case bad =>
+        return Bad(s"Not a json object, but a: " + classNameOf(bad))
+    }
+
+    val extId = try readString(jsObj, "extId") catch {
+      case ex: IllegalArgumentException =>
+        return Bad(s"Invalid post id: " + ex.getMessage)
+    }
+
+    // Try to not reject the request. [0REJREQ]
+
+    try {
+      val postTypeDefaultNormal =
+        PostType.fromInt(readOptInt(jsObj, "postType", "type").getOrElse(PostType.Normal.toInt))
+          .getOrThrowBadJson("postType")
+
+      // For now: (other post types would want a parentNr, and maybe more security /
+      // consistency checks?
+      throwForbiddenIf(postTypeDefaultNormal != PostType.ChatMessage,
+        "TyE05KTJ24", o"""Currently only chat message posts can be upserted,
+          type: ${PostType.ChatMessage}""")
+
+      Good(SimplePostPatch(
+        extId = extId,
+        postType = postTypeDefaultNormal,
+        pageRef = readString(jsObj, "pageRef"),
+        parentNr = readOptInt(jsObj, "parentNr"),
+        authorRef = readString(jsObj, "authorRef"),
+        body = readString(jsObj, "body")))
+    }
+    catch {
+      case ex: IllegalArgumentException =>
+        Bad(s"Bad json for SimplePostPatch with extId '$extId': ${ex.getMessage}")
     }
   }
 

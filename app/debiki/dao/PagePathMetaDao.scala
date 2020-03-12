@@ -19,6 +19,7 @@ package debiki.dao
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
+import org.scalactic.{ErrorMessage, Or}
 import scala.collection.immutable
 import scala.collection.mutable
 
@@ -96,6 +97,24 @@ trait PagePathMetaDao {
     memCache.lookup[PageMeta](
       pageMetaByIdKey(SitePageId(siteId, pageId)),
       orCacheAndReturn = readOnlyTransaction(_.loadPageMeta(pageId)))
+  }
+
+
+  def getPageMetaByRef(ref: Ref): Option[PageMeta] Or ErrorMessage = {
+    ???
+  }
+
+
+  def getPageMetaByParsedRef(parsedRef: ParsedRef): Option[PageMeta] = {
+    ???
+  }
+
+
+  def getPageMetaByExtId(extId: ExtId): Option[PageMeta] = {
+    val pageMetaInDb: Option[PageMeta] =
+      readOnlyTransaction(_.loadPageMetasByExtIdAsMap(Some(extId))).values.headOption
+    dieIfAny(pageMetaInDb, (p: PageMeta) => p.extImpId isNot extId, "TyE395KST82P")
+    pageMetaInDb
   }
 
 

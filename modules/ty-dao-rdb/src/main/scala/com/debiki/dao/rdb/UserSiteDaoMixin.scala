@@ -1080,9 +1080,9 @@ trait UserSiteDaoMixin extends SiteTransaction {
 
 
   def loadParticipantsInclDetailsByExtIdsAsMap_wrongGuestEmailNotfPerf(
-        extImpIds: Iterable[ExtImpId])
-        : immutable.Map[ExtImpId, ParticipantInclDetails] = {
-    loadParticipantsInclDetails_wrongGuestEmailNotfPerf_Impl[ExtImpId](
+        extImpIds: Iterable[ExtId])
+        : immutable.Map[ExtId, ParticipantInclDetails] = {
+    loadParticipantsInclDetails_wrongGuestEmailNotfPerf_Impl[ExtId](
       extImpIds, "ext_id", _.extImpId.getOrDie("TyE205HKSD63"))
   }
 

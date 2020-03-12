@@ -761,12 +761,16 @@ trait UserDao {
 
 
   def getParticipantByRef(ref: String): Option[Participant] Or ErrorMessage = {
-    parseRef(ref, allowParticipantRef = true) map {
+    parseRef(ref, allowParticipantRef = true) map getParticipantByParsedRef
+  }
+
+
+  def getParticipantByParsedRef(ref: ParsedRef): Option[Participant] = {
+    ref match {
       case ParsedRef.ExternalId(extId) =>
         getParticipantByExtId(extId)
       case ParsedRef.TalkyardId(tyId) =>
-        val id = tyId.toIntOption getOrElse { return Good(None) }
-        getParticipant(id)
+        tyId.toIntOption flatMap getParticipant
       case ParsedRef.SingleSignOnId(ssoId) =>
         getMemberBySsoId(ssoId)
       case ParsedRef.Username(username) =>
