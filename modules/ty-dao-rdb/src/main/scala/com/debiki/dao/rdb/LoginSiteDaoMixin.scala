@@ -107,7 +107,7 @@ trait LoginSiteDaoMixin extends SiteTransaction {
 
       val user = Guest(
         id = userId,
-        extImpId = extImpId,
+        extId = extImpId,
         createdAt = createdAt.getOrElse(now),
         guestName = loginAttempt.name,
         guestBrowserId = Some(loginAttempt.guestBrowserId),

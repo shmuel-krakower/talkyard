@@ -210,6 +210,19 @@ class DaoAppSuite(
   }
 
 
+  /** Like createPasswordUser() but returns a memeber with details.
+    */
+  def createPasswordUserGetDetails(username: String, dao: SiteDao,
+        trustLevel: TrustLevel = TrustLevel.NewMember,
+        threatLevel: ThreatLevel = ThreatLevel.HopefullySafe,
+        createdAt: Option[When] = None, emailVerified: Boolean = false,
+        extId: Option[ExtId] = None): UserInclDetails = {
+    val user = createPasswordUser(username, dao, trustLevel, threatLevel,
+        createdAt = createdAt, emailVerified, extId)
+    dao.readOnlyTransaction(_.loadTheUserInclDetails(user.id))
+  }
+
+
   def createGroup(dao: SiteDao, username: String, fullName: Option[String],
       createdAt: Option[When] = None, firstSeenAt: Option[When] = None): Group = {
     dao.createGroup(username, fullName, Who(SystemUserId, browserIdData)).get

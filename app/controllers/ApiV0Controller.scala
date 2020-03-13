@@ -290,7 +290,7 @@ class ApiV0Controller @Inject()(cc: ControllerComponents, edContext: EdContext,
           // Else, create new user with specified external id and email.
 
           tx.loadUserInclDetailsBySsoId(extUser.externalId).map({ user =>  // (7KAB2BA)
-            dieIf(user.externalId isNot extUser.externalId, "TyE5KR02A")
+            dieIf(user.ssoId isNot extUser.externalId, "TyE5KR02A")
             // TODO update fields, if different.
             if (extUser.primaryEmailAddress != user.primaryEmailAddress) {
               // TODO later: The external user's email address has been changed? Update this Talkyard
@@ -319,18 +319,18 @@ class ApiV0Controller @Inject()(cc: ControllerComponents, edContext: EdContext,
               // that there isn't any clash here: (5BK02A5)?
               tx.loadUserInclDetailsByEmailAddr(extUser.primaryEmailAddress).map({ user =>
 
-            dieIf(user.externalId is extUser.externalId, "TyE7AKBR2") // ought to have been found by id
+            dieIf(user.ssoId is extUser.externalId, "TyE7AKBR2") // ought to have been found by id
             dieIf(user.primaryEmailAddress != extUser.primaryEmailAddress, "TyE7AKBR8")
 
-            throwForbiddenIf(user.externalId.isDefined,
+            throwForbiddenIf(user.ssoId.isDefined,
                 "TyE5AKBR20", o"""s$siteId: Email address ${extUser.primaryEmailAddress} is already
                   in use by Talkyard user ${user.usernameHashId} which mirrors
-                  external user '${user.externalId}' — cannot create a mirror account for
+                  external user '${user.ssoId}' — cannot create a mirror account for
                   external user '${extUser.externalId} that use that same email address""")
 
             throwForbiddenIf(user.emailVerifiedAt.isEmpty,
                "TyE7BKG52A4", o"""s$siteId: Cannot connect Talkyard user ${user.usernameHashId}
-                  with external user '${user.externalId}': The Talkyard user account's email address
+                  with external user '${user.ssoId}': The Talkyard user account's email address
                   hasn't been verified.""")
 
             // Apparently this Talkyard user was created "long ago", and now we're

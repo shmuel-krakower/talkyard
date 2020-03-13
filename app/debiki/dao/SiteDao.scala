@@ -62,7 +62,6 @@ class SiteDaoFactory (
 
 trait ReadOnySiteDao {
   def getCategoryByRef(ref: Ref): Option[Category] Or ErrorMessage  // repl w ParsedRef?
-  def getPageMetaByRef(ref: Ref): Option[PageMeta] Or ErrorMessage  // remove?
   def getPageMetaByParsedRef(parsedRef: ParsedRef): Option[PageMeta]
   def getPageMetaByExtId(extId: ExtId): Option[PageMeta]
   def getParticipantByRef(ref: Ref): Option[Participant] Or ErrorMessage  // remove?

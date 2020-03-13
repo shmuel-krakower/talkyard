@@ -794,13 +794,16 @@ package object core {
 
 
   /** All columns in table page_users3.
-    * Except for these, which will be removed: (instead, there's the page_notf_prefs3 table)
+    * Except for these, will be removed: (instead, there's the page_notf_prefs3 table) [036KRMP4]
     * notf_level = null,
     * notf_reason = null
     *
     * @param inclInSummaryEmailAtMins — was this the last time this page was
     *   included in a summary email sent to the user? So won't include the same
     *   page in many summary emails to the same person.
+    *
+    * @param readingProgress — can be None, e.g. if the user got added to a new chat
+    *   page (addedById = Some(..)), but didn't visit it yet.
     */
   case class PageParticipant(
     pageId: PageId,
@@ -808,7 +811,7 @@ package object core {
     addedById: Option[UserId],
     removedById: Option[UserId],
     inclInSummaryEmailAtMins: Int,
-    readingProgress: PageReadingProgress)
+    readingProgress: Option[PageReadingProgress])
 
 
   /**
@@ -938,19 +941,6 @@ package object core {
     val MaxLowPostNr = 512  // 8 Longs = 8 * 8 bytes * 8 bits/byte = 512 bits = post nrs 1...512
 
 
-    /** Would want to set the timestamps to None instead but then need
-      * so slightly change the field types, and are there db not-null constraints?
-      */
-    def noneAlmost(now: When) = PageReadingProgress(
-      firstVisitedAt = now,
-      lastVisitedAt = now,
-      lastViewedPostNr = BodyNr,
-      lastReadAt = None,
-      lastPostNrsReadRecentFirst = Vector.empty,
-      lowPostNrsRead = Set.empty,
-      secondsReading = 0)
-
-
     /** There's a unit test.
       */
     def parseLowPostNrsReadBitsetBytes(bytes: Array[Byte]): Set[PostNr] = {
@@ -1053,6 +1043,9 @@ package object core {
 
   implicit class GetOrBadMap[G, B](val underlying: Or[G, B]) {
     def getOrIfBad(fn: B => Nothing): G = underlying.badMap(fn).get
+    def getOrDie(errorCode: String): G =
+      underlying.badMap(problem => die(errorCode, s"Bad.getOrDie: $problem")).get
+
     def getMakeGood(errorFixFn: B => G): G = underlying match {
       case Good(value) => value
       case Bad(bad) => errorFixFn(bad)

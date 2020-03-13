@@ -231,7 +231,7 @@ case class SitePatcher(globals: debiki.Globals) {
       // ----- Participants
 
       val ppsExtIds =
-        siteData.guests.flatMap(_.extImpId)
+        siteData.guests.flatMap(_.extId)
         // ++ siteData.users.flatMap(_.extImpId)  later  ... = now? [UPSMEMBRNOW]
         // ++ siteData.groups.flatMap(_.extImpId)  later  ... = now? [UPSMEMBRNOW]
       // For now:
@@ -298,11 +298,11 @@ case class SitePatcher(globals: debiki.Globals) {
 
         // We need an extId, so we won't duplicate this guest, if we import the same dump many times.
         // Later: Unless we upsert with a real id (3607TK2).
-        throwForbiddenIf(guestInPatch.extImpId.isEmpty,
+        throwForbiddenIf(guestInPatch.extId.isEmpty,
           "TyE5HKW30R", o"""Upserting guests with no extId not implemented.
           Guest temp imp id: ${guestInPatch.id}""")
 
-        val upsertedGuestRealId = guestInPatch.extImpId.flatMap(ppsInDbByExtId.get) match {
+        val upsertedGuestRealId = guestInPatch.extId.flatMap(ppsInDbByExtId.get) match {
           case None =>
             // Insert a new guest.
             val guestRealId = guestInPatch.copy(id = nextGuestId)
@@ -313,7 +313,7 @@ case class SitePatcher(globals: debiki.Globals) {
           case Some(guestInDb: Guest) =>
             // Update an exiting guest. Later. Now: noop.
             dieIf(guestInDb.id <= -LowestTempImpId, "TyE046MKP01")
-            dieIf(guestInDb.extImpId != guestInPatch.extImpId, "TyE046MKP02")
+            dieIf(guestInDb.extId != guestInPatch.extId, "TyE046MKP02")
             // Later, update guest, but when do this? If url query:  [YESUPSERT]
             //  /-/v0/upsert-patch?onConflict = UpdateIfNewer / UpdateAlways / DoNothing ?
             //if (guestTempId.updatedAt.millis > oldGuestRealId.updatedAt.millis)

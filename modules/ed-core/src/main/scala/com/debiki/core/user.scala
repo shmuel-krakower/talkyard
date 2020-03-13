@@ -95,7 +95,7 @@ case class Invite(   // [exp] ok use
 
   def makeUser(userId: UserId, username: String, currentTime: ju.Date) = UserInclDetails(
     id = userId,
-    externalId = None,
+    ssoId = None,
     fullName = None,
     username = username,
     createdAt = When.fromDate(currentTime),
@@ -136,7 +136,7 @@ sealed abstract class NewUserData {
 
   def makeUser(userId: UserId, createdAt: ju.Date) = UserInclDetails(
     id = userId,
-    externalId = None,
+    ssoId = None,
     fullName = name,
     username = username,
     createdAt = When.fromDate(createdAt),
@@ -180,8 +180,8 @@ case class NewPasswordUserData(
 
   def makeUser(userId: UserId) = UserInclDetails(
     id = userId,
-    extImpId = extId,
-    externalId = externalId,
+    extId = extId,
+    ssoId = externalId,
     fullName = name,
     username = username,
     createdAt = createdAt,
@@ -788,16 +788,16 @@ case class ExternalUser(   // sync with test code [7KBA24Y]
   * Guests don't have any trust level, cannot get more than completely-new-user access.
   * However if a guest behaves well, hens *threat level* decreases (not yet implemented).
   */
-case class Guest(   // [exp] ok
-  id: UserId,
-  override val extImpId: Option[ExtId],
-  createdAt: When,
-  guestName: String,
-  guestBrowserId: Option[String],
-  email: String,  // COULD rename to emailAddr
-  emailNotfPrefs: EmailNotfPrefs,
-  country: Option[String] = None,  // COULD rename to Location
-  lockedThreatLevel: Option[ThreatLevel] = None) extends Participant with ParticipantInclDetails {
+case class Guest( // [exp] ok
+                  id: UserId,
+                  override val extId: Option[ExtId],
+                  createdAt: When,
+                  guestName: String,
+                  guestBrowserId: Option[String],
+                  email: String, // COULD rename to emailAddr
+                  emailNotfPrefs: EmailNotfPrefs,
+                  country: Option[String] = None, // COULD rename to Location
+                  lockedThreatLevel: Option[ThreatLevel] = None) extends Participant with ParticipantInclDetails {
 
   def emailVerifiedAt: Option[ju.Date] = None
   def passwordHash: Option[String] = None
@@ -829,7 +829,7 @@ case class Guest(   // [exp] ok
 
 sealed trait ParticipantInclDetails {
   def id: UserId
-  def extImpId: Option[ExtId]
+  def extId: Option[ExtId]
   def createdAt: When
   def isBuiltIn: Boolean = Participant.isBuiltInPerson(id) || Participant.isBuiltInGroup(id)
   def noDetails: Participant
@@ -866,10 +866,10 @@ sealed trait MemberInclDetails extends ParticipantInclDetails {
 }
 
 
-case class UserInclDetails(  // ok for export
+case class UserInclDetails( // ok for export
   id: UserId,
-  extImpId: Option[ExtId] = None,  // RENAME to extId
-  externalId: Option[String],   // RENAME to 'ssoId', + in API protocol too? [395KSH20], no, just ssoId?
+  extId: Option[ExtId] = None,
+  ssoId: Option[String], // RENAME to 'ssoId' in API protocol too? [395KSH20]
   fullName: Option[String],
   username: String,
   createdAt: When,
@@ -898,22 +898,22 @@ case class UserInclDetails(  // ok for export
   suspendedTill: Option[ju.Date] = None,
   suspendedById: Option[UserId] = None,
   suspendedReason: Option[String] = None,
-  trustLevel: TrustLevel = TrustLevel.NewMember,  // RENAME to autoTrustLevel?
+  trustLevel: TrustLevel = TrustLevel.NewMember, // RENAME to autoTrustLevel?
   lockedTrustLevel: Option[TrustLevel] = None,
-  threatLevel: ThreatLevel = ThreatLevel.HopefullySafe,  // RENAME to autoThreatLevel?
+  threatLevel: ThreatLevel = ThreatLevel.HopefullySafe, // RENAME to autoThreatLevel?
   lockedThreatLevel: Option[ThreatLevel] = None,
   deactivatedAt: Option[When] = None,
   deletedAt: Option[When] = None) extends MemberInclDetails with MemberMaybeDetails {
 
   COULD; REFACTOR; QUICK // break out some of these tests to a fn shared with Group?
 
-  extImpId.flatMap(Validation.findExtIdProblem) foreach { problem =>
+  extId.flatMap(Validation.findExtIdProblem) foreach { problem =>
     throwIllegalArgument("TyE2AKT057TM", s"Bad user extId: $problem")
   }
 
   require(Participant.isOkayUserId(id), "DwE077KF2")
   require(username.length >= 2, "DwE6KYU9")
-  require(externalId.forall(_.isTrimmedNonEmpty), "TyE5KBW0Z")
+  require(ssoId.forall(_.isTrimmedNonEmpty), "TyE5KBW0Z")
   require(!username.contains(isBlank _), "EdE8FKY07")
   require(!primaryEmailAddress.contains(isBlank _), "EdE6FKU02")
   require(fullName == fullName.map(_.trim), "EdE3WKD5F")
@@ -964,6 +964,9 @@ case class UserInclDetails(  // ok for export
 
   def idSpaceName: String = s"$id @$username"
   def usernameHashId: String = s"@$username#$id"
+
+  def extIdAsRef: Option[ParsedRef.ExternalId] = extId.map(ParsedRef.ExternalId)
+  def ssoIdAsRef: Option[ParsedRef.SingleSignOnId] = ssoId.map(ParsedRef.SingleSignOnId)
 
   def primaryEmailInfo: Option[UserEmailAddress] =
     if (primaryEmailAddress.isEmpty) None
@@ -1056,7 +1059,7 @@ case class UserInclDetails(  // ok for export
     unimplementedIf(emailVerifiedAt.isDefined != externalUser.isEmailAddressVerified,
       "Diffferent email verified status, then do what? [TyE5KBRH8]")
     copy(
-      externalId = Some(externalUser.externalId),
+      ssoId = Some(externalUser.externalId),
       primaryEmailAddress = externalUser.primaryEmailAddress,
       //emailVerifiedAt = externalUser.isEmailAddressVerified,
       // username: Option[String] — keep old?
@@ -1233,24 +1236,24 @@ case class GroupAndStats(group: Group, stats: Option[GroupStats])
 /** Groups have a username but no trust level. Members have username and trust level.
   * A group can, however, auto-grant trust level 'grantsTrustLevel' to all its members.
   */
-case class Group(  // [exp] missing: createdAt, add to MemberInclDetails & ParticipantInclDetails?
-  id: UserId,
-  theUsername: String,
-  name: Option[String],
-  extImpId: Option[ExtId] = None,
-  createdAt: When = When.Genesis,  // for now
-  // emailAddr: String  <— if adding later, don't forget to update this: [306KWUSSJ24]
-  tinyAvatar: Option[UploadRef] = None,
-  smallAvatar: Option[UploadRef] = None,
-  summaryEmailIntervalMins: Option[Int] = None,
-  summaryEmailIfActive: Option[Boolean] = None,
-  grantsTrustLevel: Option[TrustLevel] = None,
-  uiPrefs: Option[JsObject] = None)
+case class Group( // [exp] missing: createdAt, add to MemberInclDetails & ParticipantInclDetails?
+                  id: UserId,
+                  theUsername: String,
+                  name: Option[String],
+                  extId: Option[ExtId] = None,
+                  createdAt: When = When.Genesis, // for now
+                  // emailAddr: String  <— if adding later, don't forget to update this: [306KWUSSJ24]
+                  tinyAvatar: Option[UploadRef] = None,
+                  smallAvatar: Option[UploadRef] = None,
+                  summaryEmailIntervalMins: Option[Int] = None,
+                  summaryEmailIfActive: Option[Boolean] = None,
+                  grantsTrustLevel: Option[TrustLevel] = None,
+                  uiPrefs: Option[JsObject] = None)
   extends Member with MemberInclDetails {  // COULD split into two? One without, one with details
 
   require(id >= Group.EveryoneId, "TyE4J5RKH24")
 
-  extImpId.flatMap(Validation.findExtIdProblem) foreach { problem =>
+  extId.flatMap(Validation.findExtIdProblem) foreach { problem =>
     throwIllegalArgument("TyE5KSH2R7H", s"Bad group extId: $problem")
   }
 

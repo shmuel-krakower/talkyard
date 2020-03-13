@@ -20,13 +20,15 @@ package talkyard.server.sitepatch
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.dao.{ForumDao, ReadOnySiteDao, SiteDao}
-import debiki.EdHttp.{throwForbiddenIf, throwForbidden}
+import debiki.EdHttp.{throwForbidden, throwForbiddenIf}
 import debiki.TextAndHtml
 import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
 import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import play.api.libs.json.JsObject
+
 import scala.collection.mutable
+import scala.collection.immutable
 
 
 /** Later: This class should not contain complete items like Category and Post. [PPATCHOBJS]
@@ -191,9 +193,9 @@ object SitePatch {
 
 case class SimpleSitePatch(
   upsertOptions: Option[UpsertOptions] = None,
-  categoryPatches: Seq[CategoryPatch] = Nil,
-  pagePatches: Seq[SimplePagePatch] = Nil,
-  postPatches: Seq[SimplePostPatch] = Nil) {
+  categoryPatches: immutable.Seq[CategoryPatch] = Nil,
+  pagePatches: immutable.Seq[SimplePagePatch] = Nil,
+  postPatches: immutable.Seq[SimplePostPatch] = Nil) {
 
 
   def loadThingsAndMakeComplete(dao: SiteDao): SitePatch Or ErrorMessage = {
@@ -347,7 +349,7 @@ case class SimpleSitePatch(
       titleHtmlUnsafe: String,
       titlePostExtId: Option[ExtId],
       bodyHtmlUnsafe: String,
-      bodyPostExtId: Option[ExtId]): () Or ErrorMessage = {
+      bodyPostExtId: Option[ExtId]): Unit Or ErrorMessage = {
       // Page already exists?
       val pageMetaInDb: Option[PageMeta] =
         pageExtId.flatMap(extId => dao.getPageMetaByExtId(extId))
@@ -461,7 +463,7 @@ case class SimpleSitePatch(
             addedById = Some(SysbotUserId), // or?
             removedById = None,
             inclInSummaryEmailAtMins = 0, // ?? what was this  : Int,
-            readingProgress = PageReadingProgress.noneAlmost(now)))
+            readingProgress = None))
       }
 
       Good(())

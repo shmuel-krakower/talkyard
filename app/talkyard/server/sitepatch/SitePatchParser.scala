@@ -118,15 +118,13 @@ case class SitePatchParser(context: EdContext) {
 
     val simplePatch = SimpleSitePatch(
       upsertOptions,
-      categoryPatches,
-      pagePatches,
-      postPatches)
+      categoryPatches.toVector,
+      pagePatches.toVector,
+      postPatches.toVector)
 
     val dao = context.globals.siteDao(siteId)
-    val completePatch = simplePatch.loadThingsAndMakeComplete(dao) match {
-      case Good(p) => p
-      case Bad(errorMessage) =>
-        throwBadRequest("TyE05JKRVHP8", s"Error interpreting patch: $errorMessage")
+    val completePatch = simplePatch.loadThingsAndMakeComplete(dao) getOrIfBad { errorMessage =>
+      throwBadRequest("TyE05JKRVHP8", s"Error interpreting patch: $errorMessage")
     }
 
     throwForbiddenIf(completePatch.hasManyThings && upsertOptions.exists(_.sendNotifications is true),
@@ -507,7 +505,7 @@ case class SitePatchParser(context: EdContext) {
       val email = readOptString(jsObj, "emailAddress").trimNoneIfBlank
       Good(Guest(
         id = id,
-        extImpId = readOptString(jsObj, "extId") orElse readOptString(jsObj, "extImpId"),
+        extId = readOptString(jsObj, "extId") orElse readOptString(jsObj, "extImpId"),
         createdAt = readWhen(jsObj, "createdAtMs"),
         guestName = readOptString(jsObj, "fullName").getOrElse(""),  // RENAME? to  guestName?
         guestBrowserId = readOptString(jsObj, "guestBrowserId"),
@@ -587,7 +585,7 @@ case class SitePatchParser(context: EdContext) {
         theUsername = readString(jsObj, "username"),
         name = readOptString(jsObj, "fullName"),
         // RENAME to extId here and everywhere else ... Done, can soon remove 'orElse ...'.
-        extImpId = readOptString(jsObj, "extId") orElse readOptString(jsObj, "extImpId"),
+        extId = readOptString(jsObj, "extId") orElse readOptString(jsObj, "extImpId"),
         createdAt = readWhen(jsObj, "createdAtMs"),
         tinyAvatar = None,   // [readlater] Option[UploadRef]  "avatarTinyHashPath"
         smallAvatar = None,  // [readlater] Option[UploadRef]
@@ -652,7 +650,7 @@ case class SitePatchParser(context: EdContext) {
       passwordHash.foreach(security.throwIfBadPassword(_, isE2eTest))
       Good(UserInclDetails(
         id = id,
-        externalId = readOptString(jsObj, "externalId"),  // RENAME to "ssoId" [395KSH20]
+        ssoId = readOptString(jsObj, "externalId"),  // RENAME to "ssoId" [395KSH20]
         username = username,
         fullName = readOptString(jsObj, "fullName"),
         createdAt = readWhen(jsObj, "createdAtMs"),
@@ -892,7 +890,8 @@ case class SitePatchParser(context: EdContext) {
     }
 
     try {
-      val readingProgress = PageReadingProgress(
+      val anyReadingProgress =
+          readOptJsObject(jsObj, "readingProgress").map(jsObj => PageReadingProgress(
         firstVisitedAt = readWhen(jsObj, "firstVisitedAt"),
         lastVisitedAt = readWhen(jsObj, "lastVisitedAt"),
         lastViewedPostNr = readInt(jsObj, "lastViewedPostNr"),
@@ -901,15 +900,15 @@ case class SitePatchParser(context: EdContext) {
           (jsObj \ "lastPostNrsReadRecentFirst").as[Vector[PostNr]],
         lowPostNrsRead =
           (jsObj \ "lowPostNrsRead").as[Set[PostNr]],
-        secondsReading = readInt(jsObj, "secondsReading"),
-      )
+        secondsReading = readInt(jsObj, "secondsReading")))
+
       Good(PageParticipant(
         pageId = readString(jsObj, "pageId"),
         userId = ppId,
         addedById = readOptInt(jsObj, "addedById"),
         removedById = readOptInt(jsObj, "removedById"),
         inclInSummaryEmailAtMins = readInt(jsObj, "inclInSummaryEmailAtMins"),
-        readingProgress = readingProgress))
+        readingProgress = anyReadingProgress))
     }
     catch {
       case ex: IllegalArgumentException =>

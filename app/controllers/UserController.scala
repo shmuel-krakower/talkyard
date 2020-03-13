@@ -495,12 +495,12 @@ class UserController @Inject()(cc: ControllerComponents, edContext: EdContext)
         "email" -> memberInclDetails.primaryEmailAddress)
     }
 
-    if (memberInclDetails.externalId.isDefined) {
+    if (memberInclDetails.ssoId.isDefined) {
       loginMethodsJson :+= Json.obj(  // UserAccountLoginMethod
         "loginType" -> "Single Sign-On",
         "provider" -> "external",
         "email" -> memberInclDetails.primaryEmailAddress,
-        "externalId" -> JsStringOrNull(memberInclDetails.externalId))
+        "externalId" -> JsStringOrNull(memberInclDetails.ssoId))
     }
 
     OkSafeJson(Json.obj(  // UserAccountResponse

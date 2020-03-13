@@ -100,13 +100,12 @@ trait PagePathMetaDao {
   }
 
 
-  def getPageMetaByRef(ref: Ref): Option[PageMeta] Or ErrorMessage = {
-    ???
-  }
-
-
   def getPageMetaByParsedRef(parsedRef: ParsedRef): Option[PageMeta] = {
-    ???
+    parsedRef match {
+      case ParsedRef.TalkyardId(id) => getPageMeta(id)
+      case ParsedRef.ExternalId(extId) => getPageMetaByExtId(extId)
+      case bad => die("TyE404KSR5", s"Bad ref type: ${classNameOf(bad)}")
+    }
   }
 
 

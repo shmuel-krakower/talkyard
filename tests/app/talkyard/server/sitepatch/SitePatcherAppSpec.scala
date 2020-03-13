@@ -29,12 +29,13 @@ import scala.collection.immutable
 // OOPS FAILS
 
 class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496ANPJ3
-  with DumpMaker {
+  with DumpMaker
+  with TwoPeopleChatSpecTrait {
 
   private def testForumQuotaLimit =
     globals.config.createSite.quotaLimitMegabytes(isForBlogComments = false, isTestSite = true)
 
-  "SiteDumpImporter can" - {
+  "SitePatcher can" - {
 
 
     // ----- Import empty
@@ -388,7 +389,7 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
         newTopicTypes = Vector(PageType.Question),  // was: Idea
         unlistCategory = false,  // was: true
         unlistTopics = false,  // was: true
-        includeInSummaries = IncludeInSummaries.Default,  // was: NoExclude
+        includeInSummaries = IncludeInSummaries.Default  // was: NoExclude
         )
 
       "upsert-edit the new sub cat" in {
@@ -697,7 +698,7 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
             site = actualDump.site,
             categories = updCats,
             pages = expectedDump.pages.map(p =>
-              if (p.pageId != upsAboutCatPage.pageId) p else aboutPageEd2),
+              if (p.pageId != upsAboutCatPage.pageId) p else aboutPageEd2)
             // posts = ...   [YESUPSERT]
             // pagePaths = ...
             )
@@ -706,45 +707,49 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
       }
 
     }
+  }
 
 
-    // ----- Helpers, for the tests below
+  // ----- Helpers, for the tests below
 
 
-    def createSiteWithOneCatPageMember(hostname: String, pageExtId: Option[ExtId] = None,
-          pageDiscussionIds: Set[AltPageId] = Set.empty)
-          : (Site, CreateForumResult, PageId, Seq[Post], User, User, SiteDao) = {
-      val (site, dao) = createSite(hostname)
-      val owen = createPasswordOwner("owner_un", dao)
-      val merrylMember = createPasswordUser("merryl_un", dao)
-      val forum: CreateForumResult = dao.createForum(
-          s"Forum $hostname", folder = "/",
-          isForEmbCmts = true, // —> the category gets ext id "embedded_comments"
-          Who(owen.id, browserIdData)
-          ) getOrDie "TyE305RTG3"
+  def createSiteWithOneCatPageMember(hostname: String, pageExtId: Option[ExtId] = None,
+        pageDiscussionIds: Set[AltPageId] = Set.empty)
+        : (Site, CreateForumResult, PageId, Seq[Post], User, User, SiteDao) = {
+    val (site, dao) = createSite(hostname)
+    val owen = createPasswordOwner("owner_un", dao)
+    val merrylMember = createPasswordUser("merryl_un", dao)
+    val forum: CreateForumResult = dao.createForum(
+        s"Forum $hostname", folder = "/",
+        isForEmbCmts = true, // —> the category gets ext id "embedded_comments"
+        Who(owen.id, browserIdData)
+        ) getOrDie "TyE305RTG3"
 
-      val pageId: PageId = createPage(
-        PageType.Discussion, textAndHtmlMaker.testTitle("Forum Title"),
-        textAndHtmlMaker.testBody("Forum intro text."), SysbotUserId, browserIdData,
-        dao, Some(forum.defaultCategoryId), extId = pageExtId, discussionIds = pageDiscussionIds)
+    val pageId: PageId = createPage(
+      PageType.Discussion, textAndHtmlMaker.testTitle("Forum Title"),
+      textAndHtmlMaker.testBody("Forum intro text."), SysbotUserId, browserIdData,
+      dao, Some(forum.defaultCategoryId), extId = pageExtId, discussionIds = pageDiscussionIds)
 
-      val pagePosts = dao.readOnlyTransaction { tx => tx.loadPostsOnPage(pageId) }
+    val pagePosts = dao.readOnlyTransaction { tx => tx.loadPostsOnPage(pageId) }
 
-      (site, forum, pageId, pagePosts, owen, merrylMember, dao)
-    }
+    (site, forum, pageId, pagePosts, owen, merrylMember, dao)
+  }
 
 
-    def makeEmbeddedCommentsCategory(forum: CreateForumResult): Category =
-      // This binds extId "embedded_comments" with a temp in-patch id, in the site patch,
-      // to the emb comments category with a real id in the database.
-      // Later, when there's a PageMetaPatch class that can reference its category
-      // by ext id (and not just internal real id), this dummy category won't be needed.
-      makeCategory(
-        CategoryWithSectPageId333.id,
-        sectionPageId = forum.pagePath.pageId,
-        defSubCat = Some(forum.defaultCategoryId)
-      ).copy(extImpId = Some("embedded_comments"))
+  def makeEmbeddedCommentsCategory(forum: CreateForumResult): Category =
+    // This binds extId "embedded_comments" with a temp in-patch id, in the site patch,
+    // to the emb comments category with a real id in the database.
+    // Later, when there's a PageMetaPatch class that can reference its category
+    // by ext id (and not just internal real id), this dummy category won't be needed.
+    makeCategory(
+      CategoryWithSectPageId333.id,
+      sectionPageId = forum.pagePath.pageId,
+      defSubCat = Some(forum.defaultCategoryId)
+    ).copy(extImpId = Some("embedded_comments"))
 
+
+
+  "SitePatcher can also" - {
 
     "Import new pages and replies, all posts approved" - {
 
@@ -1107,17 +1112,12 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
         postsWithExtImpId.length mustBe 1
       }
     }
+  }
 
 
 
-    "add a reply, via SimpleSitePatch" - {
-      val oldPageDiscId = "old_page_disc_id"
-
-      lazy val (site, forum, oldPageId, oldPagePosts, owen, _, dao) =
-        createSiteWithOneCatPageMember("ups-reply-via-page-alt-id", pageExtId = None,
-          pageDiscussionIds = Set(oldPageDiscId))
-    }
-
+  "SitePatcher can create chat topics and let two people chat" - {
+    makeTwoPeopleChatTests()
   }
 
 

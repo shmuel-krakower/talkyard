@@ -1894,7 +1894,7 @@ trait UserDao {
         id = memberBefore.id,
         // Reset the external id, so the external user will be able to sign up again. (Not our
         // choice to prevent that? That'd be the external login system's responsibility, right.)
-        externalId = None,
+        ssoId = None,
         fullName = None,
         username = anonUsername,
         createdAt = memberBefore.createdAt,
