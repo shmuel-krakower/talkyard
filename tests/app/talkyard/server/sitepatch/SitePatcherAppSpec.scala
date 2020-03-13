@@ -36,6 +36,9 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
 
   "SiteDumpImporter can" - {
 
+
+    // ----- Import empty
+
     "import nothing into an empty site" - {
       var site: Site = null
       val siteName = "empty-5079267"
@@ -71,6 +74,8 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
       }
     }
 
+
+    // ----- Import single item
 
     "import a guest, the simplest possibly use case?" - {
       var site: Site = null
@@ -139,6 +144,8 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
       }
     }
 
+
+    // ----- Import many
 
     "import a guest, a category, sub cat and an about page into an empty site" - {
       var site: Site = null
@@ -245,6 +252,8 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
 
     }
 
+
+    // ----- Sub category: parent Talkyard id
 
     "upsert new sub category, parent real id (896053), then upsert-edit the sub category" - {
       // Dupl test code. (29057902764)
@@ -402,6 +411,10 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
 
     }
 
+
+    // ----- Sub category: parent ext id
+
+    // And edit via complete and simple patches
 
     "upsert new sub category, parent ext id ref (20660367), then upsert-edit the sub category" - {
       // Dupl test code. (29057902764)
@@ -694,6 +707,8 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
 
     }
 
+
+    // ----- Helpers, for the tests below
 
 
     def createSiteWithOneCatPageMember(hostname: String, pageExtId: Option[ExtId] = None,
@@ -1091,6 +1106,16 @@ class SitePatcherAppSpec extends DaoAppSuite(disableScripts = false)  // TyT2496
         val postsWithExtImpId = actualDump.posts.filter(_.extImpId.isDefined)
         postsWithExtImpId.length mustBe 1
       }
+    }
+
+
+
+    "add a reply, via SimpleSitePatch" - {
+      val oldPageDiscId = "old_page_disc_id"
+
+      lazy val (site, forum, oldPageId, oldPagePosts, owen, _, dao) =
+        createSiteWithOneCatPageMember("ups-reply-via-page-alt-id", pageExtId = None,
+          pageDiscussionIds = Set(oldPageDiscId))
     }
 
   }

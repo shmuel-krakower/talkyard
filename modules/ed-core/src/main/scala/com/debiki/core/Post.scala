@@ -665,9 +665,9 @@ case class Post(   // [exp] ok use
 case class SimplePostPatch(
   extId: ExtId,
   postType: PostType,
-  pageRef: Ref,
+  pageRef: ParsedRef,
   parentNr: Option[PostNr],
-  authorRef: Ref,
+  authorRef: ParsedRef,
   body: String
   // later: bodyMarkupLang: Option[MarkupLang]
   ) {

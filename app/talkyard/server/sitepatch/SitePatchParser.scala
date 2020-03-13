@@ -1402,9 +1402,9 @@ case class SitePatchParser(context: EdContext) {
       Good(SimplePostPatch(
         extId = extId,
         postType = postTypeDefaultNormal,
-        pageRef = readString(jsObj, "pageRef"),
+        pageRef = readParsedRef(jsObj, "pageRef", allowParticipantRef = false),
         parentNr = readOptInt(jsObj, "parentNr"),
-        authorRef = readString(jsObj, "authorRef"),
+        authorRef = readParsedRef(jsObj, "authorRef", allowParticipantRef = true),
         body = readString(jsObj, "body")))
     }
     catch {

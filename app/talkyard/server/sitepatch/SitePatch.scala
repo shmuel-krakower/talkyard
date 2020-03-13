@@ -471,12 +471,8 @@ case class SimpleSitePatch(
     // ----- Upsert posts
 
     for (postPatch: SimplePostPatch <- postPatches) {
-      val pageRef = parseRef(postPatch.pageRef, allowParticipantRef = false) getOrIfBad { problem =>
-        return Bad(s"Bad page ref: '${postPatch.pageRef}', the problem: $problem [TyE5WKDJ05]")
-      }
-
-      val pageInDb: Option[PageMeta] = dao.getPageMetaByParsedRef(pageRef)
-      val pageInPatch: Option[PageMeta] = getPageMetaByParsedRef(pageRef)
+      val pageInDb: Option[PageMeta] = dao.getPageMetaByParsedRef(postPatch.pageRef)
+      val pageInPatch: Option[PageMeta] = getPageMetaByParsedRef(postPatch.pageRef)
       val pageMeta = pageInDb.orElse(pageInPatch) getOrElse {
         return Bad(s"Page missing, '${postPatch.pageRef}' [TyE406WKDGF4]")
       }
@@ -486,22 +482,18 @@ case class SimpleSitePatch(
 
       nextPostNrByPage(pageId) = postNr + 1
 
-      postPatch.parentNr match {
-        case Some(PageParts.BodyNr) => // ok
-        case bad =>
+      if (postPatch.parentNr isSomethingButNot BodyNr) {
+        return Bad(s"Currently can reply only to the Original Post, nr $BodyNr [TyE4QK7NJY2]")
       }
 
       val parentPostInDb: Option[Post] = postPatch.parentNr.flatMap(
-        parentNr => dao.getPostByPageIdNr(pageId, parentNr))
+        parentNr => dao.loadPostByPageIdNr(pageId, parentNr))
 
-      val parentPostInPatch: Option[Post] = postPatch.parentNr.map(getPostByNr)
+      val parentPostInPatch: Option[Post] = postPatch.parentNr.flatMap(getPostByNr)
 
       val parentPost = parentPostInDb orElse parentPostInPatch
 
-      // Dupl [502TKJF5]
-      val author = dao.getParticipantByRef(postPatch.authorRef) getOrIfBad { problem =>
-        return Bad(s"Bad author ref: '${postPatch.authorRef}', the problem: $problem [TyE5KSJRT24]")
-      } getOrElse {
+      val author = dao.getParticipantByParsedRef(postPatch.authorRef)  getOrElse {
         return Bad(s"Author not found: '${postPatch.authorRef}' [TyE502KTDXG52]")
       }
 

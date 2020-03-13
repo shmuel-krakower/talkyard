@@ -67,6 +67,7 @@ trait ReadOnySiteDao {
   def getPageMetaByExtId(extId: ExtId): Option[PageMeta]
   def getParticipantByRef(ref: Ref): Option[Participant] Or ErrorMessage  // remove?
   def getParticipantByParsedRef(ref: ParsedRef): Option[Participant]
+  def loadPostByPageIdNr(pageId: PageId, postNr: PostNr): Option[Post]
 
   def now(): When
 
