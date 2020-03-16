@@ -176,7 +176,7 @@ trait PageUsersSiteDaoMixin extends SiteTransaction {
   }
 
 
-  def loadAllPageParticipantsAllPages(): Seq[PageParticipant] = {
+  def loadAllPageParticipantsAllPages(): Vector[PageParticipant] = {
     loadAllPageParticipantsImpl(None, None)
   }
 
@@ -190,6 +190,8 @@ trait PageUsersSiteDaoMixin extends SiteTransaction {
 
     var query = """
       select
+        page_id,
+        user_id,
         joined_by_id,
         kicked_by_id,
         incl_in_summary_email_at_mins,

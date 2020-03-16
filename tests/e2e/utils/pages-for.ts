@@ -2119,6 +2119,23 @@ function pagesFor(browser) {
         api.assertExactly(num, api.watchbar.titleSelector);
       },
 
+      numUnreadTopics: (num: number): number => {
+        return api.count('.esWB_T-Unread');
+      },
+
+      openUnreadTopic: (index: number = 1): number => {
+        dieIf(index !== 1, 'unimpl [TyE6927KTS]');
+        api.repeatUntilAtNewUrl(() => {
+          api.waitAndClick('.esWB_T-Unread');
+        });
+      },
+
+      waitUntilNumUnreadTopics: (num: number) => {
+        assert.ok(num > 0, 'TyE0578WNSYG');
+        api.waitForAtLeast(num, '.esWB_T-Unread');
+        api.assertExactly(num, '.esWB_T-Unread');
+      },
+
       goToTopic: function(title: string, opts: { isHome?: true } = {}) {
         api.rememberCurrentUrl();
         api.waitForThenClickText(

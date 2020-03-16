@@ -52,34 +52,34 @@ case class SitePatch(
   upsertOptions: Option[UpsertOptions],
   site: Option[SiteInclDetails],
   settings: Option[SettingsToSave],
-  apiSecrets: Seq[ApiSecret],
-  guests: Seq[Guest],
-  guestEmailNotfPrefs: Map[String, EmailNotfPrefs],
+  apiSecrets: immutable.Seq[ApiSecret],
+  guests: immutable.Seq[Guest],
+  guestEmailNotfPrefs: immutable.Map[String, EmailNotfPrefs],
   // Includes built-in groups — they can be renamed or have their settings changed,
   // and if restoring a dump to a new site, such changes should be remembered.
-  groups: Seq[Group],
-  groupPps: Seq[GroupParticipant],
-  users: Seq[UserInclDetails],
-  pptStats: Seq[UserStats],
-  pptVisitStats: Seq[UserVisitStats],
-  usernameUsages: Seq[UsernameUsage],
-  memberEmailAddrs: Seq[UserEmailAddress],
-  identities: Seq[Identity],
-  invites: Seq[Invite],
-  notifications: Seq[Notification],
-  categoryPatches: Seq[CategoryPatch],
-  categories: Seq[Category],  // later, remove, see: [PPATCHOBJS]
-  pages: Seq[PageMeta],
-  pagePaths: Seq[PagePathWithId],
-  pageIdsByAltIds: Map[AltPageId, PageId],
-  pagePopularityScores: Seq[PagePopularityScores],
-  pageNotfPrefs: Seq[PageNotfPref],
-  pageParticipants: Seq[PageParticipant],
-  drafts: Seq[Draft],
-  posts: Seq[Post],
-  postActions: Seq[PostAction],
-  permsOnPages: Seq[PermsOnPages],
-  reviewTasks: Seq[ReviewTask],
+  groups: immutable.Seq[Group],
+  groupPps: immutable.Seq[GroupParticipant],
+  users: immutable.Seq[UserInclDetails],
+  pptStats: immutable.Seq[UserStats],
+  pptVisitStats: immutable.Seq[UserVisitStats],
+  usernameUsages: immutable.Seq[UsernameUsage],
+  memberEmailAddrs: immutable.Seq[UserEmailAddress],
+  identities: immutable.Seq[Identity],
+  invites: immutable.Seq[Invite],
+  notifications: immutable.Seq[Notification],
+  categoryPatches: immutable.Seq[CategoryPatch],
+  categories: immutable.Seq[Category],  // later, remove, see: [PPATCHOBJS]
+  pages: immutable.Seq[PageMeta],
+  pagePaths: immutable.Seq[PagePathWithId],
+  pageIdsByAltIds: immutable.Map[AltPageId, PageId],
+  pagePopularityScores: immutable.Seq[PagePopularityScores],
+  pageNotfPrefs: immutable.Seq[PageNotfPref],
+  pageParticipants: immutable.Seq[PageParticipant],
+  drafts: immutable.Seq[Draft],
+  posts: immutable.Seq[Post],
+  postActions: immutable.Seq[PostAction],
+  permsOnPages: immutable.Seq[PermsOnPages],
+  reviewTasks: immutable.Seq[ReviewTask],
   // This is if the data in the dump, is just test data and can be deleted.
   // This might be different from if the server runs in Test mode, or if
   // we're upserting via an e2e test endpoint or not — see importRealSiteData()
@@ -462,7 +462,7 @@ case class SimpleSitePatch(
             userId = pp.id,
             addedById = Some(SysbotUserId), // or?
             removedById = None,
-            inclInSummaryEmailAtMins = 0, // ?? what was this  : Int,
+            inclInSummaryEmailAtMins = 0,
             readingProgress = None))
       }
 
@@ -475,6 +475,26 @@ case class SimpleSitePatch(
     for (postPatch: SimplePostPatch <- postPatches) {
       val pageInDb: Option[PageMeta] = dao.getPageMetaByParsedRef(postPatch.pageRef)
       val pageInPatch: Option[PageMeta] = getPageMetaByParsedRef(postPatch.pageRef)
+
+      // Any page in the database is really the same as the one in the patch?
+      (pageInDb, pageInPatch) match {
+        case (Some(thePageInDb), Some(thePageInPatch)) =>
+          if (thePageInDb.extImpId != thePageInPatch.extImpId)
+            return Bad(o"""The supposedly same page in db as the one in the patch,
+              have different extId:s, so they are *not* the same page:
+              ext id in db: '${thePageInDb.extImpId}',
+              in the patch: '${thePageInPatch.extImpId}'  [TyE05MRKJ6]""")
+
+          if (!isPageTempId(thePageInPatch.pageId) &&
+              thePageInDb.pageId != thePageInPatch.pageId)
+            return Bad(o"""The supposedly same page in db as the one in the patch,
+              have different ids, so they are *not* the same page:
+              page id in db: '${thePageInDb.pageId}',
+              in patch: '${thePageInPatch.pageId}'  [TyE7KDQ42K2]""")
+
+        case _ =>
+      }
+
       val pageMeta = pageInDb.orElse(pageInPatch) getOrElse {
         return Bad(s"Page missing, '${postPatch.pageRef}' [TyE406WKDGF4]")
       }
@@ -531,7 +551,7 @@ case class SimpleSitePatch(
     }
 
     def getPostByNr(postNr: PostNr): Option[Post] = {
-      posts.find(_.nr == postNr)
+      posts.find(_.nr == postNr)   // but which page  ???
     }
 
 

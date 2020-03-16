@@ -23,6 +23,7 @@ import debiki.{JsonMaker, Settings2}
 import ed.server._
 import play.api.libs.json._
 import scala.collection.mutable
+import scala.collection.immutable
 import talkyard.server.JsX._
 
 
@@ -48,8 +49,8 @@ case class SitePatchMaker(context: EdContext) {
       // with all inner Options being Some?  So that:
       //   EditedSettings = SettingsToSave[Option[Some[...]]]
 
-      val guests: Seq[Guest] = tx.loadAllGuests().filter(!_.isBuiltIn).sortBy(_.id)
-      val guestEmailNotfPrefs: Map[String, EmailNotfPrefs] = tx.loadAllGuestEmailNotfPrefsByEmailAddr()
+      val guests: immutable.Seq[Guest] = tx.loadAllGuests().filter(!_.isBuiltIn).sortBy(_.id)
+      val guestEmailNotfPrefs: immutable.Map[String, EmailNotfPrefs] = tx.loadAllGuestEmailNotfPrefsByEmailAddr()
 
       val users = tx.loadAllUsersInclDetails().filter(!_.isBuiltIn).sortBy(_.id)
 
@@ -59,6 +60,8 @@ case class SitePatchMaker(context: EdContext) {
 
       val pagePaths = tx.loadAllPagePaths().sortBy(_.pageId)
 
+      val pagePps = tx.loadAllPageParticipantsAllPages().sortBy(_.pageId)
+
       val categories = tx.loadCategoryMap().values.toVector.sortBy(_.id)
 
       val permsOnPages = tx.loadPermsOnPages()
@@ -67,7 +70,9 @@ case class SitePatchMaker(context: EdContext) {
 
       val posts = tx.loadAllPosts().sortBy(_.id)
 
-      val postActions: Seq[PostAction] = tx.loadAllPostActions()
+      val postActions: immutable.Seq[PostAction] = tx.loadAllPostActions()
+
+      val notfs = tx.loadAllNotifications()
 
       SitePatch.empty.copy(
         site = Some(site),
@@ -77,9 +82,11 @@ case class SitePatchMaker(context: EdContext) {
         pptStats = pptStats,
         guests = guests,
         guestEmailNotfPrefs = guestEmailNotfPrefs,
+        notifications = notfs,
         categories = categories,
         pages = pageMetas,
         pagePaths = pagePaths,
+        pageParticipants = pagePps,
         pageIdsByAltIds = tx.loadAllAltPageIds(),
         permsOnPages = permsOnPages,
         drafts = drafts,

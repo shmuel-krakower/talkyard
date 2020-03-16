@@ -34,57 +34,221 @@ trait TwoPeopleChatSpecTrait {
     lazy val siteDao = globals.siteDao(site.id)
 
     lazy val (site, forum, oldPageId, oldPagePosts, owen, merrylMember, dao) =
-      createSiteWithOneCatPageMember("2-ppl-chat", pageExtId = None)
+      createSiteWithOneCatPageMember("2-ppl-chat", pageExtId = None, ownerUsername = "owen")
 
-    lazy val chatPagePatch = SimplePagePatch(
-      extId = "chatPageExtId",
-      pageType = Some(PageType.PrivateChat),
-      categoryRef = Some(s"tyid:${forum.defaultCategoryId}"),
-      authorRef = Some(s"tyid:$SysbotUserId"),
-      pageMemberRefs = Vector(alice.extIdAsRef.get, bob.extIdAsRef.get),
-      title = "Chat Page Title",
-      body = "Chat between Alice and Bob")
-
-    lazy val aliceSaysHiBobMessage = SimplePostPatch(
-      extId = "aliceSaysHiBobMessage-ext-id",
-      postType = PostType.ChatMessage,
-      pageRef = ParsedRef.ExternalId(chatPagePatch.extId),
-      parentNr = None,
-      authorRef = alice.extIdAsRef.get,
-      body = "Hi Bob, Alice here")
-
-    lazy val bobSaysHiAliceMessage = SimplePostPatch(
-      extId = "bobSaysHiAliceMessage-ext-id",
-      postType = PostType.ChatMessage,
-      pageRef = ParsedRef.ExternalId(chatPagePatch.extId),
-      parentNr = None,
-      authorRef = bob.extIdAsRef.get,
-      body = "Bob is my name. I am Bob. How did you know? Was it mind reading? " +
-        "But I wasn't thinking about my name when you said hi")
+    var prevSiteDump: SitePatch = null
 
     lazy val alice = createPasswordUserGetDetails("alice_un", dao, extId = Some("Alice-ExtId"))
     lazy val bob = createPasswordUserGetDetails("bob_un", dao, extId = Some("Bob-ExtId"))
     lazy val sarah = createPasswordUserGetDetails("sarah_un", dao, extId = Some("Sarah-ExtId"))
     lazy val sanjo = createPasswordUserGetDetails("sanjo_un", dao, extId = Some("Sanjo-ExtId"))
 
+    lazy val chatPagePatch = SimplePagePatch(
+      extId = "chatPageExtId",
+      pageType = Some(PageType.PrivateChat),
+      categoryRef = Some(s"tyid:${forum.defaultCategoryId}"),
+      authorRef = alice.extId.map("extid:" + _),
+      pageMemberRefs = Vector(alice.extIdAsRef.get, bob.extIdAsRef.get),
+      title = "Chat Page Title",
+      body = "Chat between Alice and Bob")
+
+    lazy val chatPagePatch2 = chatPagePatch.copy(
+      extId = "chatPage2ExtId",
+      pageMemberRefs = Vector(sarah.extIdAsRef.get, sanjo.extIdAsRef.get),
+      title = "Chat Page Title 2",
+      body = "Chat between Sarah and Sanjo")
+
+
+    def makeChatMessage(extId: ExtId, pagePatch: SimplePagePatch,
+        author: UserInclDetails, text: String) =
+      SimplePostPatch(
+        extId = extId,
+        postType = PostType.ChatMessage,
+        pageRef = ParsedRef.ExternalId(pagePatch.extId),
+        parentNr = None,
+        authorRef = author.extIdAsRef.get,
+        body = text)
+
+
     "Create anew site with a chat topic" in {
       site
+      prevSiteDump = SitePatchMaker(context).loadSiteDump(site.id)
     }
+
+
+    lazy val aliceSaysHiBobMessage = makeChatMessage(
+      extId = "aliceSaysHiBobMessage-ext-id",
+      chatPagePatch,
+      alice,
+      "Hi Bob, Alice here")
 
     "Upsert a chat topic with a single message from Alice to Bob" in {
       val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
         pagePatches = Vector(chatPagePatch),
         postPatches = Vector(aliceSaysHiBobMessage))
-      val completePatch = simplePatch.makeComplete(siteDao).getOrDie("TyE7WKRD036")
-      upsert(site.id, completePatch)
+      upsertSimplePatch(simplePatch, siteDao)
     }
+
+    "... check the changes 05697826" in {
+      checkChanges(
+        numNewPages = 1,         // Alice's message to Bob
+        numNewPosts =  3,        // title, body, message
+        numNewPostsByAlice = 3,  //  – "" —
+        // Alice's message is the last post:
+        lastPostBy = alice.id,
+        lastPostCheckFn = (alicesPost: Post) => {
+          alicesPost.currentSource mustBe aliceSaysHiBobMessage.body
+          alicesPost.isCurrentVersionApproved mustBe true
+        },
+        // One notf to Bob about Alice's message:
+        numNewNotfs = 1,
+        newNotfCheckFn = { case Seq(notf) =>
+          notf.toUserId mustBe bob.id
+          notf.byUserId mustBe alice.id
+          notf.tyype mustBe NotificationType.Message
+        })
+    }
+
+    def checkChanges(numNewPages: Int = 0, numNewPosts: Int,
+          numNewPostsByAlice: Int = 0, numNewPostsByBob: Int = 0,
+          numNewPostsBySarah: Int = 0, numNewPostsBySanjo: Int = 0,
+          lastPostBy: UserId,
+          lastPostCheckFn: Post => Unit,
+          numNewNotfs: Int,
+          newNotfCheckFn: Seq[Notification.NewPost] => Unit = null
+          ) {
+      val curDump = SitePatchMaker(context).loadSiteDump(site.id)
+      curDump.pages.length mustBe (prevSiteDump.pages.length + numNewPages)
+      curDump.posts.length mustBe (prevSiteDump.posts.length + numNewPosts)
+
+      val prevPostsByAuthorId = prevSiteDump.posts.groupBy(_.createdById)
+      val curPostsByAuthorId = curDump.posts.groupBy(_.createdById)
+
+      {
+        def numCurBy(userId: Int) = curPostsByAuthorId.getOrElse(userId, Nil).length
+        def numPrevBy(userId: Int) = prevPostsByAuthorId.getOrElse(userId, Nil).length
+        numCurBy(alice.id) mustBe (numPrevBy(alice.id) + numNewPostsByAlice)
+        numCurBy(bob.id)   mustBe (numPrevBy(bob.id)   + numNewPostsByBob)
+        numCurBy(sarah.id) mustBe (numPrevBy(sarah.id) + numNewPostsBySarah)
+        numCurBy(sanjo.id) mustBe (numPrevBy(sanjo.id) + numNewPostsBySanjo)
+      }
+
+      curDump.posts.last.createdById mustBe lastPostBy
+      lastPostCheckFn(curDump.posts.last)
+
+      curDump.notifications.length mustBe (prevSiteDump.notifications.length + numNewNotfs)
+      if (numNewNotfs > 0) {
+        newNotfCheckFn(
+            curDump.notifications.takeRight(numNewNotfs)
+              .asInstanceOf[Seq[Notification.NewPost]])
+      }
+
+      prevSiteDump = curDump
+    }
+
+
+    lazy val bobSaysHiAliceMessage = aliceSaysHiBobMessage.copy(
+      extId = "bobSaysHiAliceMessage-ext-id",
+      authorRef = bob.extIdAsRef.get,
+      body = "Yes Bob is my name. How did you know? ... Mind reading? " +
+        "But I wasn't thinking about my name")
 
     "Bob replies" in {
       val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
         postPatches = Vector(bobSaysHiAliceMessage))
-      val completePatch = simplePatch.makeComplete(siteDao).getOrDie("TyE7WKRD036")
-      upsert(site.id, completePatch)
+      upsertSimplePatch(simplePatch, siteDao)
     }
+
+    "... check the changes 7039067258" in {
+      checkChanges(
+        // Bob's reply:
+        numNewPosts = 1,
+        numNewPostsByBob = 1,
+        lastPostBy = bob.id,
+        lastPostCheckFn = (post: Post) => {
+          post.currentSource mustBe bobSaysHiAliceMessage.body
+          post.isCurrentVersionApproved mustBe true
+        },
+        // A notf to Alice:
+        numNewNotfs = 1,
+        newNotfCheckFn = { case Seq(notf) =>
+          notf.toUserId mustBe alice.id
+          notf.byUserId mustBe bob.id
+          notf.tyype mustBe NotificationType.NewPost  // ?
+        })
+    }
+
+
+    lazy val sarahSaysHiSanjoMessage = makeChatMessage(
+      extId = "sarahSaysHiSanjoMessage ext id",
+      chatPagePatch2,
+      sarah,
+      "Hi Sanjo, how was school today? What's one plus one?")
+
+    "Sarah and Sanjo starts another discussion in parallel" in {
+      val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
+        pagePatches = Vector(chatPagePatch2),
+        postPatches = Vector(sarahSaysHiSanjoMessage))
+      upsertSimplePatch(simplePatch, siteDao)
+    }
+
+    lazy val sanjoRelpiesMessage = makeChatMessage(
+      extId = "sanjoRelpiesMessage ext id",
+      chatPagePatch2,
+      sanjo,
+      "Like in one snowball plus one snowball equals how many snowballs?")
+
+    "Sanjo replies" in {
+      val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
+        pagePatches = Vector(chatPagePatch2),
+        postPatches = Vector(sanjoRelpiesMessage))
+      upsertSimplePatch(simplePatch, siteDao)
+    }
+
+    lazy val sanjosEditedReply = sanjoRelpiesMessage.copy(
+      body = sanjoRelpiesMessage.body + "\n" +
+        "Or one rabbit plus one fox equals how many rabbits?\n" +
+        "Or one rabbit plus one rabbit equals how many rabbits?\n")
+
+    "Sanjo edits her reply — page included in patch" in {
+      val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
+        postPatches = Vector(sanjosEditedReply))
+      upsertSimplePatch(simplePatch, siteDao)
+    }
+
+    lazy val sanjosEditedReply2 = sanjoRelpiesMessage.copy(
+      body = sanjosEditedReply.body +
+        "Or one snowball plus a sunny day becomes how many snowballs?")
+
+    "Sanjo edits her reply again — page *not* included in patch" in {
+      val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
+        postPatches = Vector(sanjosEditedReply2))
+      upsertSimplePatch(simplePatch, siteDao)
+    }
+
+    lazy val sarahRepliesMessage = makeChatMessage(
+      extId = "sarahRepliesMessage ext id",
+      chatPagePatch,
+      sarah,
+      "Sanjo, I'm older than you, and must know better?")
+
+    "Sarah replies" in {
+      val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
+        pagePatches = Vector(chatPagePatch2),
+        postPatches = Vector(sarahRepliesMessage))
+      upsertSimplePatch(simplePatch, siteDao)
+    }
+
+
+    // Notifications
+    // Edit —> edits, not new reply
   }
 
 }

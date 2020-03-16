@@ -15,19 +15,21 @@ const tyAssert = {
   eq: (actual, expected, message?) => {
     // Show the two values on two lines, aligned, so one sees at a glance
     // what's wrong.
-    if (!message) {
-      message = '\n\n' +
+    let wholeMessage = '\n\n' +
           `  assert.eq: Actual value differs from expected value:\n` +
           `        actual:  ${actual}\n` +
           `      expected:  ${expected}\n`;
+    if (message) {
+      wholeMessage += `Details: ${message}\n`;
     }
-    assert.strictEqual(actual, expected, message);
+    assert.strictEqual(actual, expected, wholeMessage);
   },
 
   refEq: (actual, expected) => {
     assert.ok(actual === expected,
-      `Not reference-equal, actual: ${JSON.stringify(actual)}, ` +
-          `expected: ${JSON.stringify(expected)}`);
+      `  assert.refEq: Not reference-equal:\n` +
+      `      actual:  ${JSON.stringify(actual)}\n` +
+      `    expected:  ${JSON.stringify(expected)}\n`);
   },
 
   greaterThan: (actual, min) => {

@@ -645,6 +645,15 @@ sealed trait Participant {
   def nameParaId: String =
     anyUsername.map(un => s"@$un (id $id)") getOrElse s"'$usernameOrGuestName' (id $id)"
 
+  def toMemberOrThrow: Member = {
+    this match {
+      case m: User => m
+      case g: Guest => throw GotAGuestException(g.id)
+      case g: Group => g
+      case UnknownParticipant => throw GotUnknownUserException
+    }
+  }
+
   def toUserOrThrow: User = {
     this match {
       case m: User => m

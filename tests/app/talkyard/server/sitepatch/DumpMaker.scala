@@ -21,7 +21,7 @@ import java.io.RandomAccessFile
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp.ResultException
-import debiki.dao.DaoAppSuite
+import debiki.dao.{DaoAppSuite, SiteDao}
 import org.scalatest._
 import java.{io => jio}
 
@@ -33,6 +33,12 @@ trait DumpMaker {
   def upsert(siteId: SiteId, patch: SitePatch) {
     val importer = SitePatcher(globals)
     importer.upsertIntoExistingSite(siteId, patch, browserIdData)
+  }
+
+  def upsertSimplePatch(simplePatch: SimpleSitePatch, siteDao: SiteDao) {
+    val importer = SitePatcher(globals)
+    val completePatch = simplePatch.makeComplete(siteDao).getOrDie("TyETSTSIMPL2COMPL")
+    importer.upsertIntoExistingSite(siteDao.siteId, completePatch, browserIdData)
   }
 
 

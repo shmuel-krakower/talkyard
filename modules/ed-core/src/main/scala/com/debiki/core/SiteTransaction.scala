@@ -171,7 +171,7 @@ trait SiteTransaction {
   def upsertReadProgress(userId: UserId, pageId: PageId, pageTimings: PageReadingProgress)
   def rememberHasIncludedInSummaryEmail(userId: UserId, pageId: PageId, now: When)
 
-  def loadAllPageParticipantsAllPages(): Seq[PageParticipant]
+  def loadAllPageParticipantsAllPages(): immutable.Seq[PageParticipant]
   def insertPageParticipant(pagePp: PageParticipant)
 
   def loadPageVisitTrusts(pageId: PageId): Map[UserId, VisitTrust]
@@ -445,7 +445,14 @@ trait SiteTransaction {
     loadParticipant(userId).map(_.toUserOrThrow)
   }
   def loadTheUser(userId: UserId): User = loadUser(userId).getOrDie(
-    "EsEFK320FG", s"Member $userId missing")
+    "TyEFK320FG", s"User $userId missing")
+
+  def loadMember(memberId: UserId): Option[Member] = {
+    dieIf(memberId <= Participant.MaxGuestId, "TyE502KTD25", memberId)
+    loadParticipant(memberId).map(_.toMemberOrThrow)
+  }
+  def loadTheMember(memberId: UserId): Member = loadMember(memberId).getOrDie(
+    "TyE205THW53", s"Member $memberId missing")
 
   def isAdmin(userId: UserId): Boolean = loadUser(userId).exists(_.isAdmin)
 
@@ -589,7 +596,7 @@ trait SiteTransaction {
   def markNotfsAsSeen(userId: UserId, notfId: Option[NotificationId], skipEmails: Boolean)
   def markNotfsForPostIdsAsSeen(userId: UserId, postIds: Set[PostId], skipEmails: Boolean): Int
 
-  def loadAllNotifications(): Seq[Notification]
+  def loadAllNotifications(): immutable.Seq[Notification]
 
   /** This skips review tasks notfs — they're shown in the admin area instead, the review tab. */
   def loadNotificationsToShowInMyMenu(roleId: RoleId, limit: Int, unseenFirst: Boolean,

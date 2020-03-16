@@ -65,7 +65,7 @@ object CreateSiteDao {  RENAME // but to what. & move, but to where?
   }
 
 
-  def makeDefaultGroups(now: When): Seq[Group] = {
+  def makeDefaultGroups(now: When): Vector[Group] = {
     import Group._
 
     val Everyone = Group(
