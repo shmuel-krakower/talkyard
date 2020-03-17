@@ -952,6 +952,9 @@ case class SitePatcher(globals: debiki.Globals) {
 
       // ----- Notifications
 
+      REFACTOR // Change SimpleSitePatch to a ActionPatch — then, this Notifications
+      // stuff here can be removed. [ACTNPATCH]
+
       if (siteData.upsertOptions.exists(_.sendNotifications is true)) {
         val notfGenerator: NotificationGenerator = NotificationGenerator(
           tx, dao, dao.context.nashorn, globals.config)
@@ -971,6 +974,8 @@ case class SitePatcher(globals: debiki.Globals) {
         }
 
         // Group chats, direct messages:
+        // But this is dead code? because notfGenerator.generateForNewPost() [PATCHNOTF]
+        // above happens first?
         for {
           (pageId, pagePps) <- pagesToMaybeNotfAbout
           pageMeta = tx.loadThePageMeta(pageId)
@@ -982,7 +987,8 @@ case class SitePatcher(globals: debiki.Globals) {
           val pagePpsExclAuthr = pagePps.filter(_.userId != pageMeta.authorId)
           val mmemberIdsToNotify = pagePpsExclAuthr.map(_.userId)
           // Ooops! remembers sentTo  :- /
-          val notifications = notfGenerator.generateForMessage(sender, pageBody, mmemberIdsToNotify.toSet)
+          notfGenerator.generateForMessage(
+            sender, pageBody, mmemberIdsToNotify.toSet)
         }
 
         tx.saveDeleteNotifications(notfGenerator.generatedNotifications)

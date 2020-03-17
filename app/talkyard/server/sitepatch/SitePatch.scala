@@ -47,6 +47,8 @@ import scala.collection.immutable
   *
   * SitePatch is a (possibly small) set of changes to do to a site,
   * whilst a SiteDump is a SitePatch that includes the whole site.
+  *
+  * RENAME to SiteUpsertPatch? [ACTNPATCH]
   */
 case class SitePatch(
   upsertOptions: Option[UpsertOptions],
@@ -191,6 +193,12 @@ object SitePatch {
 
 
 
+/** REFACTOR  Change SimpleSitePatch to a ActionPatch? [ACTNPATCH] and do *not*
+  * generate a SitePatch to import — instead, iterate through the things
+  * in the ActionPatch and call the correct Dao functions to make things
+  * happen in the same way as if people were doing things via their web client.
+  * All in the same transaction.
+  */
 case class SimpleSitePatch(
   upsertOptions: Option[UpsertOptions] = None,
   categoryPatches: immutable.Seq[CategoryPatch] = Nil,
@@ -215,6 +223,10 @@ case class SimpleSitePatch(
     * makeComplete() adds a patch for the category's About page body post too — because
     * that's where the description is kept (.i.e in the About page,
     * the page body post text).
+    *
+    * REFACTOR [ACTNPATCH] Instead of the above, have a class ActionPatcher that
+    * live-applies all changes in an ActionPatch, without constructing an intermediate
+    * SitePatch.
     */
   def makeComplete(dao: ReadOnySiteDao): SitePatch Or ErrorMessage = {  // why not a r/o tx?
     var nextCategoryId = LowestTempImpId

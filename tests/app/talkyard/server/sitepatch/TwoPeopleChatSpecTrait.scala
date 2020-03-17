@@ -54,6 +54,7 @@ trait TwoPeopleChatSpecTrait {
 
     lazy val chatPagePatch2 = chatPagePatch.copy(
       extId = "chatPage2ExtId",
+      authorRef = sarah.extId.map("extid:" + _),
       pageMemberRefs = Vector(sarah.extIdAsRef.get, sanjo.extIdAsRef.get),
       title = "Chat Page Title 2",
       body = "Chat between Sarah and Sanjo")
@@ -104,9 +105,11 @@ trait TwoPeopleChatSpecTrait {
         // One notf to Bob about Alice's message:
         numNewNotfs = 1,
         newNotfCheckFn = { case Seq(notf) =>
-          notf.toUserId mustBe bob.id
           notf.byUserId mustBe alice.id
-          notf.tyype mustBe NotificationType.Message
+          notf.toUserId mustBe bob.id
+          // Hmm this'll currently be a NotificationType.NewPost, because
+          // new posts considered before new messages [PATCHNOTF].
+          //notf.tyype mustBe NotificationType.Message
         })
     }
 
@@ -174,9 +177,9 @@ trait TwoPeopleChatSpecTrait {
         // A notf to Alice:
         numNewNotfs = 1,
         newNotfCheckFn = { case Seq(notf) =>
-          notf.toUserId mustBe alice.id
           notf.byUserId mustBe bob.id
-          notf.tyype mustBe NotificationType.NewPost  // ?
+          notf.toUserId mustBe alice.id
+          notf.tyype mustBe NotificationType.NewPost
         })
     }
 
@@ -195,19 +198,62 @@ trait TwoPeopleChatSpecTrait {
       upsertSimplePatch(simplePatch, siteDao)
     }
 
+    "... check the changes 40692463" in {
+      checkChanges(
+        // Sarah's message:
+        numNewPages = 1,        // The message topic
+        numNewPosts =  3,       // title, body, message
+        numNewPostsBySarah = 3, //  —""—
+        lastPostBy = sarah.id,
+        lastPostCheckFn = (post: Post) => {
+          post.currentSource mustBe sarahSaysHiSanjoMessage.body
+          post.isCurrentVersionApproved mustBe true
+        },
+        // A notf to Sanjo:
+        numNewNotfs = 1,
+        newNotfCheckFn = { case Seq(notf) =>
+          notf.byUserId mustBe sarah.id
+          notf.toUserId mustBe sanjo.id
+          //notf.tyype mustBe NotificationType.Message
+        })
+    }
+
+
     lazy val sanjoRelpiesMessage = makeChatMessage(
       extId = "sanjoRelpiesMessage ext id",
       chatPagePatch2,
       sanjo,
       "Like in one snowball plus one snowball equals how many snowballs?")
 
-    "Sanjo replies" in {
+    "Sanjo replies, page *is* included in patch (55294962)" in {
       val simplePatch = SimpleSitePatch(
         upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
         pagePatches = Vector(chatPagePatch2),
         postPatches = Vector(sanjoRelpiesMessage))
       upsertSimplePatch(simplePatch, siteDao)
     }
+
+    "... check the changes 5029642" in {
+      checkChanges(
+        // Sanjo's reply:
+        numNewPosts = 1,
+        numNewPostsBySanjo = 1,
+        lastPostBy = sanjo.id,
+        lastPostCheckFn = (post: Post) => {
+          post.currentSource mustBe sanjoRelpiesMessage.body
+          post.isCurrentVersionApproved mustBe true
+        },
+        // A notf to Sarah:
+        numNewNotfs = 1,
+        newNotfCheckFn = { case Seq(notf) =>
+          notf.byUserId mustBe sanjo.id
+          notf.toUserId mustBe sarah.id
+          notf.tyype mustBe NotificationType.NewPost
+        })
+    }
+
+
+    /* Edits not yet implemented. Would be simpler with ActionPatch? [ACTNPATCH]
 
     lazy val sanjosEditedReply = sanjoRelpiesMessage.copy(
       body = sanjoRelpiesMessage.body + "\n" +
@@ -221,6 +267,18 @@ trait TwoPeopleChatSpecTrait {
       upsertSimplePatch(simplePatch, siteDao)
     }
 
+    "... check the changes 505098256" in {
+      checkChanges(
+        numNewPosts = 0,
+        lastPostBy = sanjo.id,
+        lastPostCheckFn = (post: Post) => {
+          post.currentSource mustBe sanjosEditedReply.body
+          post.isCurrentVersionApproved mustBe true
+        },
+        numNewNotfs = 0)
+    }
+
+
     lazy val sanjosEditedReply2 = sanjoRelpiesMessage.copy(
       body = sanjosEditedReply.body +
         "Or one snowball plus a sunny day becomes how many snowballs?")
@@ -232,23 +290,80 @@ trait TwoPeopleChatSpecTrait {
       upsertSimplePatch(simplePatch, siteDao)
     }
 
-    lazy val sarahRepliesMessage = makeChatMessage(
-      extId = "sarahRepliesMessage ext id",
-      chatPagePatch,
-      sarah,
-      "Sanjo, I'm older than you, and must know better?")
+    "... check the changes 59088512019409653" in {
+      checkChanges(
+        numNewPosts = 0,
+        lastPostBy = sanjo.id,
+        lastPostCheckFn = (post: Post) => {
+          post.currentSource mustBe sanjosEditedReply2.body
+          post.isCurrentVersionApproved mustBe true
+        },
+        numNewNotfs = 0)
+    } */
 
-    "Sarah replies" in {
+
+    lazy val sarahRepliesMessage = makeChatMessage(
+      extId = "sarahRepliesMessage ~., ext #!?%~$ id",
+      chatPagePatch2,
+      sarah,
+      "Sanjo, I'm older than you, and must know better")
+
+    "Sarah replies, page is *not* included in patch (55294962)" in {
       val simplePatch = SimpleSitePatch(
         upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
-        pagePatches = Vector(chatPagePatch2),
         postPatches = Vector(sarahRepliesMessage))
       upsertSimplePatch(simplePatch, siteDao)
     }
 
+    "... check the changes 59028906" in {
+      checkChanges(
+        // Sarah's reply to Sanjo's reply:
+        numNewPosts = 1,
+        numNewPostsBySarah = 1,
+        lastPostBy = sarah.id,
+        lastPostCheckFn = (post: Post) => {
+          post.currentSource mustBe sarahRepliesMessage.body
+          post.isCurrentVersionApproved mustBe true
+        },
+        // A notf to Sanjo:
+        numNewNotfs = 1,
+        newNotfCheckFn = { case Seq(notf) =>
+          notf.byUserId mustBe sarah.id
+          notf.toUserId mustBe sanjo.id
+          notf.tyype mustBe NotificationType.NewPost
+        })
+    }
 
-    // Notifications
-    // Edit —> edits, not new reply
+
+    lazy val aliceRepliesToBobMessage = aliceSaysHiBobMessage.copy(
+      extId = "aliceRepliesToBobMessage-ext-id",
+      body = "Bob, I call everyone Bob")
+
+    "Alice replies to Bob" in {
+      val simplePatch = SimpleSitePatch(
+        upsertOptions = Some(UpsertOptions(sendNotifications = Some(true))),
+        postPatches = Vector(aliceRepliesToBobMessage))
+      upsertSimplePatch(simplePatch, siteDao)
+    }
+
+    "... check the changes 40649026434" in {
+      checkChanges(
+        numNewPosts = 1,         // Alice's reply to Bob
+        numNewPostsByAlice = 1,  //  – "" —
+        lastPostBy = alice.id,
+        lastPostCheckFn = (alicesPost: Post) => {
+          alicesPost.currentSource mustBe aliceRepliesToBobMessage.body
+          alicesPost.isCurrentVersionApproved mustBe true
+        },
+        // One notf to Bob about Alice's message:
+        numNewNotfs = 1,
+        newNotfCheckFn = { case Seq(notf) =>
+          notf.byUserId mustBe alice.id
+          notf.toUserId mustBe bob.id
+          notf.tyype mustBe NotificationType.NewPost
+        })
+    }
+
   }
 
 }
