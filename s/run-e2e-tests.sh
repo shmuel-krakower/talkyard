@@ -400,6 +400,7 @@ function runAllE2eTests {
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-upsert-categories.2browsers $args
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-upsert-pages.2browsers $args
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-upsert-page-notfs.2browsers $args
+  #    api-private-chat-two-participants
 
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only slow-3g-navigate-edit-drafts.2browsers $args
 

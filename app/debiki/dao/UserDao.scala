@@ -741,6 +741,7 @@ trait UserDao {
 
 
   def loadUsersWithPrefix(prefix: String): immutable.Seq[User] = {  RENAME // to ...WithUsernamePrefix
+    // CACHE
     readOnlyTransaction(_.loadUsersWithPrefix(prefix))
   }
 

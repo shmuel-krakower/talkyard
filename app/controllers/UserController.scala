@@ -25,9 +25,11 @@ import debiki.dao.{ReadMoreResult, SiteDao}
 import debiki.EdHttp._
 import ed.server.http._
 import java.{util => ju}
+
 import play.api.mvc
 import play.api.libs.json._
-import play.api.mvc.{Action, ControllerComponents}
+import play.api.mvc.{Action, ControllerComponents, Result}
+
 import scala.util.Try
 import scala.collection.immutable
 import debiki.RateLimits.TrackReadingActivity
@@ -1246,16 +1248,38 @@ class UserController @Inject()(cc: ControllerComponents, edContext: EdContext)
     // Authorization check: Is a member? Add MemberGetAction?
     request.theMember
 
+    listAllUsersImpl(usernamePrefix, isViaApi = false, request)
+  }
+
+
+  SECURITY // user listing disabled? [8FKU2A4]
+  def listAllUsersPubApi(usernamePrefix: String): Action[Unit] = GetAction { request =>
+    // Ok also if not logged in? So can use from a non-Talkyard client + API secret.
+    throwForbiddenIf(!request.siteSettings.enableApi,
+      "TyE4305RKCGL4", o"""API not enabled. If you're admin, you can enable it
+         in the Admin Area | Settings | Features tab.""")
+    listAllUsersImpl(usernamePrefix, isViaApi = true, request)
+  }
+
+
+  private def listAllUsersImpl(usernamePrefix: String, isViaApi: Boolean,
+        request: ApiRequest[_]): Result = {
     // Also load deleted anon12345 members. Simpler, and they'll typically be very few or none. [5KKQXA4]
+    // ... stop doing that?
     val members = request.dao.loadUsersWithPrefix(usernamePrefix)
-    val json = JsArray(
+    val result = JsArray(
       members map { member =>
-        Json.obj(
+        var json = Json.obj(
           "id" -> member.id,
           "username" -> member.username,
           "fullName" -> member.fullName)
+        if (isViaApi) {
+          json += "extId" -> JsString(member.extId)
+          json += "ssoId" -> JsString(member.ssoId)
+        }
+        json
       })
-    OkSafeJson(json)
+    OkSafeJson(result)
   }
 
 
