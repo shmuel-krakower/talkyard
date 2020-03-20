@@ -1274,8 +1274,8 @@ class UserController @Inject()(cc: ControllerComponents, edContext: EdContext)
           "username" -> member.username,
           "fullName" -> member.fullName)
         if (isViaApi) {
-          json += "extId" -> JsString(member.extId)
-          json += "ssoId" -> JsString(member.ssoId)
+          json += "extId" -> JsNull // JsString(member.extId)
+          json += "ssoId" -> JsNull // JsString(member.ssoId)
         }
         json
       })

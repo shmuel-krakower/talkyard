@@ -551,7 +551,7 @@ trait UserDao {
 
   def createPasswordUserCheckPasswordStrong(userData: NewPasswordUserData, browserIdData: BrowserIdData)
         : User = {
-    dieIf(userData.externalId.isDefined, "TyE5BKW02QX")
+    dieIf(userData.ssoId.isDefined, "TyE5BKW02QX")
     security.throwErrorIfPasswordBad(
       password = userData.password.getOrDie("TyE2AKB84"), username = userData.username,
       fullName = userData.name, email = userData.email,

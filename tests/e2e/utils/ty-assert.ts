@@ -20,7 +20,9 @@ const tyAssert = {
           `        actual:  ${actual}\n` +
           `      expected:  ${expected}\n`;
     if (message) {
-      wholeMessage += `Details: ${message}\n`;
+      wholeMessage +=
+          `  Details:\n` +
+          `    ${message}\n`;
     }
     assert.strictEqual(actual, expected, wholeMessage);
   },
@@ -41,16 +43,14 @@ const tyAssert = {
   includes: (text: string, expectedSubstring: string, message?: string) => {
     // Could make this work w regexs too.
     const ix = text.indexOf(expectedSubstring);
-    const isOk = ix >= 0;
-    if (!isOk) console.log(''); // nice with a blank line
-    assert.ok(isOk, message ||
-      `assert.includes:\n` +
-      `    This:  "${expectedSubstring}"\n` +
-      `    is missing from:  (between the ----)\n` +
+    assert.ok(ix >= 0, '\n\n' + (message ||
+      `  assert.includes:\n` +
+      `     This:  "${expectedSubstring}"\n` +
+      `     is missing from:  (between the ----)\n` +
       `------------------------------------------------------------------------\n` +
       `${text}\n` +
       `------------------------------------------------------------------------\n` +
-      `\n`);
+      `\n`));
   },
 
   excludes: (text: string, unexpectedSubstring: string, message?: string) => {

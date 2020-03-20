@@ -19,6 +19,7 @@ package talkyard.server.sitepatch
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
+import debiki.dao.SiteDao
 import debiki.{JsonMaker, Settings2}
 import ed.server._
 import play.api.libs.json._
@@ -31,6 +32,8 @@ import talkyard.server.JsX._
 /** Creates json and .tar individual site backup files.
   *
   * Search for [readlater] for stuff ignored right now.
+  *
+  * Split into two: SitePatchMaker and ActionPatchResultJsonMaker? [ACTNPATCH]
   */
 case class SitePatchMaker(context: EdContext) {
 
@@ -106,14 +109,20 @@ object SitePatchMaker {
     *
     * (Some time later, for really large sites, might be better to load things directly
     * from a db transaction, rather than creating an intermediate representation.)
+    *
+    * Split into two fns? [ACTNPATCH]
     */
   def createPostgresqlJsonBackup(anyDump: Option[SitePatch] = None,  // RENAME makeSiteJsonDump?
-        anyTx: Option[SiteTransaction] = None, simpleFormat: Boolean): JsObject = {
+        anyTx: Option[SiteTransaction] = None, simpleFormat: Boolean,
+        anyDao: Option[SiteDao] = None): JsObject = {
 
     require(anyDump.isDefined != anyTx.isDefined, "TyE0627KTLFRU")
+    require(simpleFormat == anyDao.isDefined, "TyEG503WKL2")
+    require(simpleFormat == anyDump.isDefined, "TyEG503WKL3")
 
     val fields = mutable.HashMap.empty[String, JsValue]
     def tx = anyTx getOrDie "TyE06RKDJFD"
+    val dao = anyDao getOrDie "TyE52KTJC57"
 
       val anySite: Option[SiteInclDetails] =
         anyDump.map(_.site) getOrElse Some(tx.loadSiteInclDetails().getOrDie("TyE2S6WKDL"))
@@ -253,7 +262,19 @@ object SitePatchMaker {
       fields("drafts") = JsArray(drafts map JsDraft)
 
       val posts: Seq[Post] = anyDump.map(_.posts) getOrElse tx.loadAllPosts()
-      fields("posts") = JsArray(posts map JsPostInclDetails)
+      fields("posts") = JsArray(
+        posts.map((post: Post) => {
+          var json = JsPostInclDetails(post)
+          if (simpleFormat) {
+            val canonicalPath: PagePathWithId =
+              pagePaths.find(p => p.pageId == post.pageId && p.canonical)
+              .orElse(dao.getPagePath2(post.pageId)) getOrDie "TyE703KDNF36"
+            json +=
+              "urlPaths" -> Json.obj(
+                "canonical" -> JsString(canonicalPath.value + "post-" + post.nr))
+          }
+          json
+        }))
 
       val postsActions: Seq[PostAction] =
         anyDump.map(_.postActions) getOrElse tx.loadAllPostActions()

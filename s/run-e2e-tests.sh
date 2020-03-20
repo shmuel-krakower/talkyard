@@ -397,6 +397,10 @@ function runAllE2eTests {
 
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only group-permissions-similar-topics.2browsers $args
 
+
+  # API
+  # ------------
+
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-upsert-categories.2browsers $args
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-upsert-pages.2browsers $args
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-upsert-page-notfs.2browsers $args
@@ -415,19 +419,6 @@ function runAllE2eTests {
   # ------------
 
   $r s/wdio target/e2e/wdio.conf.js         --only utx-all-logins $args
-
-
-  #------------------------------------------------------------
-  # Start a http server, for the embedding html pages, if needed.
-  server_port_8080=$(netstat -nl | grep ':8080.*LISTEN')
-  server_port_8080_pid=''
-  if [ -z "$server_port_8080" ]; then
-    echo "Starting a http server for embedded comments html pages..."
-    ./node_modules/.bin/http-server -p8080 target/ &
-    # Field 2 is the process id.
-    server_port_8080_pid=$(jobs -l | grep p8080 | awk '{ printf $2; }')
-  fi
-  # else: the user has probably started the server henself already, do nothing.
 
 
   # Single Sign-On
@@ -449,6 +440,20 @@ function runAllE2eTests {
   # ------------
 
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-w-sso-upsert-pages.2browsers $args
+  $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-private-chat-two-pps-notfs-sso-extid.2browsers.test.ts $args
+
+
+  #------------------------------------------------------------
+  # Start a http server, for the embedding html pages, if needed.
+  server_port_8080=$(netstat -nl | grep ':8080.*LISTEN')
+  server_port_8080_pid=''
+  if [ -z "$server_port_8080" ]; then
+    echo "Starting a http server for embedded comments html pages..."
+    ./node_modules/.bin/http-server -p8080 target/ &
+    # Field 2 is the process id.
+    server_port_8080_pid=$(jobs -l | grep p8080 | awk '{ printf $2; }')
+  fi
+  # else: the user has probably started the server henself already, do nothing.
 
 
   # Embedded forum

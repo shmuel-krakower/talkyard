@@ -75,11 +75,16 @@ trait PagePathMetaDao {
   }
 
 
-  def getPagePath(pageId: PageId): Option[PagePath] = {
+  def getPagePath2(pageId: PageId): Option[PagePathWithId] = {
     memCache.lookup(
       _pathByPageIdKey(pageId),
       orCacheAndReturn =
-        readOnlyTransaction(_.loadPagePath(pageId) .map(_.toOld(siteId))))
+        readOnlyTransaction(_.loadPagePath(pageId)))
+  }
+
+
+  def getPagePath(pageId: PageId): Option[PagePath] = {
+    getPagePath2(pageId) .map(_.toOld(siteId))
   }
 
 

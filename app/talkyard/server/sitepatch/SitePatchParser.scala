@@ -124,7 +124,7 @@ case class SitePatchParser(context: EdContext) {
 
     val dao = context.globals.siteDao(siteId)
     val completePatch = simplePatch.loadThingsAndMakeComplete(dao) getOrIfBad { errorMessage =>
-      throwBadRequest("TyE05JKRVHP8", s"Error interpreting patch: $errorMessage")
+      throwBadRequest("TyE05JKRVHP8", s"s$siteId: Error interpreting patch: $errorMessage")
     }
 
     throwForbiddenIf(completePatch.hasManyThings && upsertOptions.exists(_.sendNotifications is true),

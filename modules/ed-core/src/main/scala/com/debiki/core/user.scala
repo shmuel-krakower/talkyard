@@ -164,7 +164,7 @@ case class NewPasswordUserData(
   username: String,
   email: String,
   password: Option[String],
-  externalId: Option[String],  // RENAME to ssoId
+  ssoId: Option[String],
   createdAt: When,
   firstSeenAt: Option[When],
   isAdmin: Boolean,
@@ -181,7 +181,7 @@ case class NewPasswordUserData(
   def makeUser(userId: UserId) = UserInclDetails(
     id = userId,
     extId = extId,
-    ssoId = externalId,
+    ssoId = ssoId,
     fullName = name,
     username = username,
     createdAt = createdAt,
@@ -203,7 +203,7 @@ case class NewPasswordUserData(
   dieIfBad(Validation.checkEmail(email), "TyE4WKBJ7Z", identity)
   // Password: See security.throwErrorIfPasswordTooWeak, instead.
 
-  require(externalId.isDefined != password.isDefined, "TyE5VAKBR02")
+  require(ssoId.isDefined != password.isDefined, "TyE5VAKBR02")
   require(!firstSeenAt.exists(_.isBefore(createdAt)), "TyE2WVKF063")
 }
 
@@ -213,7 +213,7 @@ object NewPasswordUserData {
         name: Option[String], username: String, email: String,
         password: Option[String] = None,
         extId: Option[ExtId] = None,
-        externalId: Option[String] = None, // RENAME to ssoId   SECURITY validate?
+        ssoId: Option[String] = None, // SECURITY validate?
         createdAt: When,
         isAdmin: Boolean, isOwner: Boolean, isModerator: Boolean = false,
         emailVerifiedAt: Option[When] = None,
@@ -230,7 +230,7 @@ object NewPasswordUserData {
     }
     yield {
       NewPasswordUserData(name = okName, username = okUsername, email = okEmail,
-        password = password, externalId = externalId, createdAt = createdAt,
+        password = password, ssoId = ssoId, createdAt = createdAt,
         firstSeenAt = Some(createdAt),  // for now
         isAdmin = isAdmin, isOwner = isOwner, isModerator = isModerator,
         emailVerifiedAt = emailVerifiedAt, extId = extId,
@@ -771,7 +771,8 @@ trait MemberMaybeDetails {
 
 
 case class ExternalUser(   // sync with test code [7KBA24Y]
-  externalId: String,
+  ssoId: String,
+  extId: Option[String],
   primaryEmailAddress: String,
   isEmailAddressVerified: Boolean,
   username: Option[String],
@@ -781,9 +782,9 @@ case class ExternalUser(   // sync with test code [7KBA24Y]
   isAdmin: Boolean,
   isModerator: Boolean) {
 
-  require(externalId.isTrimmedNonEmpty, "TyE5KBW01")
+  require(ssoId.isTrimmedNonEmpty, "TyE5KBW01")
   Validation.checkEmail(primaryEmailAddress).badMap(errorMessage =>
-    die("TyE5KBW02", s"Bad email: $primaryEmailAddress, for external user id: '$externalId'"))
+    die("TyE5KBW02", s"Bad email: $primaryEmailAddress, for external user 'ssoid:$ssoId'"))
   require(username.forall(_.isTrimmedNonEmpty), "TyE5KBW05")
   require(fullName.forall(_.isTrimmedNonEmpty), "TyE5KBW06")
   require(avatarUrl.forall(_.isTrimmedNonEmpty), "TyE5KBW07")
@@ -1068,7 +1069,7 @@ case class UserInclDetails( // ok for export
     unimplementedIf(emailVerifiedAt.isDefined != externalUser.isEmailAddressVerified,
       "Diffferent email verified status, then do what? [TyE5KBRH8]")
     copy(
-      ssoId = Some(externalUser.externalId),
+      ssoId = Some(externalUser.ssoId),
       primaryEmailAddress = externalUser.primaryEmailAddress,
       //emailVerifiedAt = externalUser.isEmailAddressVerified,
       // username: Option[String] — keep old?

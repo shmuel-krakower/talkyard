@@ -32,7 +32,7 @@ let chatUrl;
 const owensFirstMessageMariaNotified = 'owensFirstMessageMariaNotified';
 const mariasMessageOwenMichaelNotified = 'mariasMessageOwenMichaelNotified';
 const owensTopSecretToMichael = 'owensTopSecretToMichael';
-const owenMentionsMaria = 'owenMentionsMaria';
+const michaelMentionsMaria = 'michaelMentionsMaria';
 
 
 describe("private chat  TyT2ABKR045", function() {
@@ -232,7 +232,7 @@ describe("private chat  TyT2ABKR045", function() {
   // ----- After having left the chat: No more notifications
 
   it("Owen writes something, top secret, Maria must not see", () => {
-///    prevNumEmails = server.getEmailsSentToAddrs(siteId).num;
+    prevNumEmails = server.getEmailsSentToAddrs(siteId).num;
     owen.chat.addChatMessage(owensTopSecretToMichael);
   });
 
@@ -252,12 +252,12 @@ describe("private chat  TyT2ABKR045", function() {
 
   it("Mentioning someone not in this *private* chat, generates *no* notf " +
         "(but does, in a public chat)", () => {
-    owen.chat.addChatMessage(owenMentionsMaria + ` @${maria.username}`);
+    michael.chat.addChatMessage(michaelMentionsMaria + ` @${maria.username}`);
   });
 
-  it("... Michael gets a notf email", () => {
+  it("... Owen gets a notf email (since he's in the chat)", () => {
     server.waitUntilLastEmailMatches(
-        siteId, michael.emailAddress, [owenMentionsMaria], michael);
+        siteId, owen.emailAddress, [michaelMentionsMaria], michael);
   });
 
   it("... but not Maria", () => {

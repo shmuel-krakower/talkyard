@@ -48,6 +48,7 @@ case class SitePatcher(globals: debiki.Globals) {
     val upsertedCategories = ArrayBuffer[Category]()
     val upsertedPages = ArrayBuffer[PageMeta]()
     val upsertedPagePaths = ArrayBuffer[PagePathWithId]()
+    val upsertedReplies = ArrayBuffer[Post]()
     val pageIdsWithBadStats = mutable.HashSet[PageId]()
     var wroteToDatabase = false
 
@@ -521,7 +522,7 @@ case class SitePatcher(globals: debiki.Globals) {
             dieIf(postTempParentNr.parentNr != postInPatch.parentNr, "TyE306RKTJ2")
 
             val postRealIdsNrsNoHtml =
-              if (postInPatch.parentNr.isEmpty) {
+              if (postInPatch.parentNr.forall(_ < FirstTempImpId)) {
                 postTempParentNr
               }
               else {
@@ -574,6 +575,10 @@ case class SitePatcher(globals: debiki.Globals) {
             // I'd think something won't be found when running notf creation related queries.
             // (We exclude titles further below.)
             postsToMaybeNotfAbout.append(postReal)
+
+            if (postReal.isReply) {
+              upsertedReplies.append(postReal)
+            }
           }
         }
       }
@@ -1006,8 +1011,15 @@ case class SitePatcher(globals: debiki.Globals) {
     // Categories and pages is what the current Talkyard API consumers need. As of November 2019.
     // The /-/v0/upsert-simple endpoint also wants the category locations (url paths),
     // so, we need the forum section page paths, so included below.
+    // And any posts, so can direct link to e.g. chat messages upserted via API
+    //  — but exclude title and body posts; then, instead, the pages[] is enough?
+    REFACTOR // sometimes return a ActionPatchApiResponse  [ACTNPATCH], if is
+    // an ActionPatch "upsert" — which will be an API thing.
+    // Don't expose all internal fields
+    // — that'd make other ppls things break if I rename anything
     SitePatch.empty.copy(
       pages = upsertedPages.toVector,
+      posts = upsertedReplies.toVector,
       pagePaths = (upsertedPagePaths ++ sectionPagePaths).distinct.toVector,
       categories = upsertedCategories.toVector)
   }

@@ -2123,7 +2123,7 @@ function pagesFor(browser) {
         return api.count('.esWB_T-Unread');
       },
 
-      openUnreadTopic: (index: number = 1): number => {
+      openUnreadTopic: (index: number = 1) => {
         dieIf(index !== 1, 'unimpl [TyE6927KTS]');
         api.repeatUntilAtNewUrl(() => {
           api.waitAndClick('.esWB_T-Unread');
@@ -3669,6 +3669,9 @@ function pagesFor(browser) {
       },
 
       waitForPostAssertTextMatches: function(postNr, text: string) {
+        dieIf(!_.isString(text) && !_.isRegExp(text),
+            "Test broken: `text` is not a string nor a regex [TyEJ53068MSK]");
+
         api.switchToEmbCommentsIframeIfNeeded();
         /* // Only doing this:
         api.topic.waitForPostNrVisible(postNr);

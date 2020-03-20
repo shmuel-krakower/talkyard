@@ -107,8 +107,11 @@ case class SitePatch(
 
   def theSite: SiteInclDetails = site.getOrDie("TyE053KKPSA6")
 
-  def toSimpleJson: JsObject = {
-    SitePatchMaker.createPostgresqlJsonBackup(anyDump = Some(this), simpleFormat = true)
+  def toSimpleJson(siteDao: SiteDao): JsObject = {
+    SitePatchMaker.createPostgresqlJsonBackup(
+      anyDump = Some(this),
+      simpleFormat = true,
+      anyDao = Some(siteDao))
   }
 
   def toPatchJson: JsObject = {
