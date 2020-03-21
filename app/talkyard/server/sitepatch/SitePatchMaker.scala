@@ -122,7 +122,7 @@ object SitePatchMaker {
 
     val fields = mutable.HashMap.empty[String, JsValue]
     def tx = anyTx getOrDie "TyE06RKDJFD"
-    val dao = anyDao getOrDie "TyE52KTJC57"
+    def dao = anyDao getOrDie "TyE52KTJC57"
 
       val anySite: Option[SiteInclDetails] =
         anyDump.map(_.site) getOrElse Some(tx.loadSiteInclDetails().getOrDie("TyE2S6WKDL"))
