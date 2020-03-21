@@ -1,4 +1,5 @@
-import assert = require('assert');
+import * as _ from 'lodash';
+import * as assert from 'assert';
 
 
 const tyAssert = {
@@ -38,6 +39,21 @@ const tyAssert = {
     assert.ok(actual > min,
       `Value too small: ${JSON.stringify(actual)}, ` +
           `should be at least: ${JSON.stringify(min)}`);
+  },
+
+  matches: (text: string, regexOrString: RegExp | string) => {
+    assert.fail("Untested [TyE4069RKTS$]");
+    /*
+      const regex = _.isString(regexOrString) ?
+          new RegExp(regexOrString) : regexOrString;
+      assert(regex.test(text), '\n\n' +
+          `  assert.matches:\n` +
+          `       This regex:  ${regex.toString()}\n` +
+          `       does not match:  (between the ----)\n` +
+          `------------------------------------------------------------------------\n` +
+          `${text}\n` +
+          `------------------------------------------------------------------------\n` +
+          `\n`); */
   },
 
   includes: (text: string, expectedSubstring: string, message?: string) => {

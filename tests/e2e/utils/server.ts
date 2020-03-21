@@ -488,6 +488,12 @@ function upsertSimple(ps: { origin: string, apiRequesterId: UserId, apiSecret: s
   return ps.fail ? response.bodyText : response.bodyJson();
 }
 
+function listUsers(ps: { origin: string, usernamePrefix: string }): ListUsersApiResponse {
+  const url = ps.origin + '/-/v0/list-users?usernamePrefix=' + ps.usernamePrefix;
+  const response = getOrDie(url);
+  return JSON.parse(response.body);
+}
+
 
 
 // ----- Export functions
@@ -524,6 +530,7 @@ export = {
   apiV0: {
     upsertUserGetLoginSecret,
     upsertSimple,
+    listUsers,
   },
 };
 

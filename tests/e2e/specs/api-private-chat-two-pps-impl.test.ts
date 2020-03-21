@@ -20,6 +20,8 @@ let owen: Member;
 let owensBrowser;
 let charliesBrowser;
 let chumasBrowser;
+let mallory;
+let mallorysBrowser;
 let strangersBrowser;
 
 let siteIdAddress: IdAddress;
@@ -102,7 +104,10 @@ const chumaRepliesToCharlie = {
 
 
 
-describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
+export default function addApiChatTestSteps(variants: {
+      lookupAndUseUsernames?: boolean,
+      useExtIdAndSsoId?: boolean }) {
+  lad.dieIf(variants.lookupAndUseUsernames == variants.useExtIdAndSsoId, 'TyE3068KHNKW2');
 
   if (settings.prod) {
     console.log("Skipping this spec — the server needs to have upsert conf vals enabled."); // E2EBUG
@@ -118,7 +123,7 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
       categoryExtId,  // instead of: [05KUDTEDW24]
       title: "Api Priv Chat 2 Participants E2E Test",
       // But Chuma and Charlie are the users active in this test (SSO-created later).
-      members: ['owen', 'maria', 'michael'],
+      members: ['owen', 'maria', 'michael', 'mallory'],
     });
     assert.refEq(builder.getSite(), forum.siteData);
     const site: SiteData2 = forum.siteData;
@@ -141,6 +146,8 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
     owensBrowser = richBrowserA;
     charliesBrowser = richBrowserA;
     chumasBrowser = richBrowserB;
+    mallory = forum.members.mallory;
+    mallorysBrowser = richBrowserB;
   });
 
 
@@ -172,28 +179,59 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
   });
 
 
+  // ----- API: List users
 
-  let owensOneTimeLoginSecret;
+  if (variants.lookupAndUseUsernames) {
+    let listUsersResponse: ListUsersApiResponse;
 
-  it("The remote server generates a login secret for Owen", () => {
-    const owenExtUser = utils.makeExternalUserFor(owen, { ssoId: owensSsoId });
-    owensOneTimeLoginSecret = server.apiV0.upsertUserGetLoginSecret({
+    it("Chuma lists all members, using a 3rd party client and Ty's API", () => {
+      listUsersResponse = server.apiV0.listUsers({
         origin: siteIdAddress.origin,
-        apiRequesterId: c.SysbotUserId,
-        apiSecret: apiSecret.secretKey,
-        externalUser: owenExtUser });
-  });
+        usernamePrefix: '',
+      });
+    });
 
-  /*
-  it("... Owen logs in", () => {
-    owensBrowser.apiV0.loginWithSecret({
+    it("... Finds ... and .........", () => {
+    });
+
+    it("... lists only members starting with 'ch'", () => {
+      listUsersResponse = server.apiV0.listUsers({
         origin: siteIdAddress.origin,
-        oneTimeSecret: owensOneTimeLoginSecret,
-        thenGoTo: '/' });
-  }); */
+        usernamePrefix: 'ch',
+      });
+    });
+
+    it("... Finds two people", () => {
+      assert.eq(listUsersResponse.members.length, 2);
+    });
+
+    let charlieFromApi: UserIdName;
+
+    it("... namely Charlie", () => {
+      charlieFromApi = listUsersResponse.members[0];
+      assert.eq(charlieFromApi.username, charlieExtUser.username);
+    });
+
+    let chumaFromApi: UserIdName;
+
+    it("... and Chuma", () => {
+      chumaFromApi = listUsersResponse.members[1];
+      assert.eq(chumaFromApi.username, chumaExtUser.username);
+    });
+
+    it("Make this test use 'username:...' refs, not 'extid:' or 'ssoid:'", () => {
+      const chumaRef = `username:${chumaFromApi.username}`;
+      const charlieRef = `username:${charlieFromApi.username}`;
+      chatPageOne.authorRef = chumaRef;
+      chatPageOne.pageMemberRefs = [chumaRef, charlieRef];
+      chumaSaysHiCharlie.authorRef = chumaRef;
+      charlieSaysHiChuma.authorRef = charlieRef;
+      chumaRepliesToCharlie.authorRef = chumaRef;
+    });
+  }
 
 
-  // ----- API upsert chat page incl first message
+  // ----- API: Upsert chat page incl first message
 
   let upsertResponse;
 
@@ -318,6 +356,9 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
   });
 
 
+
+  // ----- Access control: Strangers
+
   it("Charlies opens the notification link", () => {
     charliesBrowser.go2(charliesNotfLink);
   });
@@ -327,6 +368,8 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
     charliesBrowser.assertNotFoundError();
   });
 
+
+  // ----- Access control ctd, + Login link
 
   it("Charlie logs in via his one-time login link", () => {
     charliesBrowser.apiV0.loginWithSecret({
@@ -347,11 +390,36 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
   });
 
 
+  // ----- Access control: Other members
+
+  it("Mallory logs in", () => {
+    utils.ssoLogin({ member: mallory, ssoId: 'mallorys sso id', browser: mallorysBrowser,
+        origin: siteIdAddress.origin, server, apiSecret: apiSecret.secretKey,
+        thenGoTo: charliesNotfLink });
+  });
+
+  it("... but not allowed", () => {
+    mallorysBrowser.assertNotFoundError();
+  });
+
+
+  // ----- Page ok?
+
+  it("The page looks fine", () => {
+    charliesBrowser.chat.waitAndAssertPurposeMatches(chatPageOne.body);
+    charliesBrowser.topic.assertPostTextMatches(
+        c.FirstReplyNr + 0, chumaSaysHiCharlie.body);
+    charliesBrowser.topic.assertPostTextMatches(
+        c.FirstReplyNr + 1, charlieSaysHiChuma.body);
+    // c.FirstReplyNr + 2, chumaRepliesToCharlie: tested already.
+  });
+
+
   // ----- The upserted page works: Can post replies via Ty's interface, not only API
 
   it("Charlie posts a message", () => {
     charliesBrowser.chat.addChatMessage(
-        `This works just like ducks digging for bucks`);
+        `This works fine, like ducks digging for bucks to buy daisies`);
   });
 
   it("... Chuma gets notified", () => {
@@ -366,5 +434,5 @@ describe("api-private-chat-two-pps-notfs   TyT603WKVJW336", () => {
     prevNumEmailsSent = num;
   });
 
-});
+}
 

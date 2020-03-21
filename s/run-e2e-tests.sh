@@ -440,7 +440,8 @@ function runAllE2eTests {
   # ------------
 
   $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-w-sso-upsert-pages.2browsers $args
-  $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-private-chat-two-pps-notfs-sso-extid.2browsers.test.ts $args
+  $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-private-chat-two-pps-sso-extid.2browsers $args
+  $r s/wdio target/e2e/wdio.2chrome.conf.js --only api-private-chat-two-pps-list-use-usernames.2browsers $args
 
 
   #------------------------------------------------------------

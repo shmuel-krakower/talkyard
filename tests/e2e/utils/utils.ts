@@ -2,7 +2,8 @@
 
 import * as _ from 'lodash';
 import * as assert from './ty-assert';
-import { logUnusual, dieIf } from './log-and-die';
+import { logMessage, logUnusual, dieIf } from './log-and-die';
+import c = require('../test-constants');
 
 
 declare const settings;
@@ -69,6 +70,24 @@ const utils = {
     dieIf(mustMatch && !matches,
         `No link matching /${regexString}/ found in email [EsE5GPYK2], text: ${text}`);
     return matches ? matches[1] : undefined;
+  },
+
+  ssoLogin: (ps: { member: Member, ssoId, browser,
+        origin: string, server, apiSecret: string, apiRequesterId?: UserId,
+        thenGoTo: string }) => {
+    const extUser = utils.makeExternalUserFor(ps.member, { ssoId: ps.ssoId });
+    logMessage(`SSO: Upserting @${ps.member.username}, getting a one time secret ...`);
+    const oneTimeLoginSecret = ps.server.apiV0.upsertUserGetLoginSecret({
+        origin: ps.origin,
+        apiRequesterId: ps.apiRequesterId || c.SysbotUserId,
+        apiSecret: ps.apiSecret,
+        externalUser: extUser });
+    logMessage(`SSO: Logging in as @${ps.member.username}, using one time secret ...`);
+    ps.browser.apiV0.loginWithSecret({
+        origin: ps.origin,
+        oneTimeSecret: oneTimeLoginSecret,
+        thenGoTo: ps.thenGoTo || '/' });
+    logMessage(`SSO: Done`);
   },
 
   makeExternalUserFor: (member: Member, opts: {

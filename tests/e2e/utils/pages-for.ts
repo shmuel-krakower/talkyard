@@ -8,10 +8,15 @@ import settings = require('./settings');
 import server = require('./server');
 import utils = require('../utils/utils');
 import c = require('../test-constants');
-import { logUnusual, logError, logWarning, logMessage, printBoringToStdout, die, dieIf } from './log-and-die';
+import { logUnusual, logError, logWarning, logMessage,
+    logServerRequest, printBoringToStdout, die, dieIf } from './log-and-die';
 
 
 //  RENAME  this file, but to what?  E2eBrowser? (RichBrowser like Scala's RichString etc?)
+//  RENAME  waitAndGetSth, waitAndClick... to just getSth, click, etc,
+//          and fns that don't wait, call them  getSthNow  and clickNow  instead,
+//          since almost all fns wait until ok to procceed, so that's the 95% normal
+//          case — then better that those names are brief.
 
 
 // Brekpoint debug help counters, use like so:  if (++ca == 1) debugger;
@@ -178,8 +183,8 @@ function pagesFor(browser) {
         }
       }
 
-      const message = `Go: ${url}${shallDisableRateLimits ? " & disable rate limits" : ''}`;
-      logMessage(message);
+      const message = `Go: ${url}${shallDisableRateLimits ? "  & disable rate limits" : ''}`;
+      logServerRequest(message);
       try {
         browser.url(url);
       }
@@ -1403,9 +1408,17 @@ function pagesFor(browser) {
       if (_.isString(regex)) {
         regex = new RegExp(regex);
       }
+      else if (!_.isRegExp(regex)) {
+        die(`Not a string or regex: ${JSON.stringify(regex)} [TyE603KHJMSH550]`);
+      }
+
       if (_.isString(regex2)) {
         regex2 = new RegExp(regex2);
       }
+      else if (regex2 && !_.isRegExp(regex2)) {
+        die(`regex2 is not a string or regex: ${JSON.stringify(regex2)} [TyE603KHJMSH]`);
+      }
+
       // Log a friendly error, if the selector is absent — that'd be a test suite bug.
       // Without this assert...isVisible, Webdriver just prints "Error" and one won't know
       // what the problem is.
@@ -4332,6 +4345,10 @@ function pagesFor(browser) {
     chat: {
       joinChat: () => {
         api.waitAndClick('#theJoinChatB');
+      },
+
+      waitAndAssertPurposeMatches: (regex: RegExp | string) => {
+        api.waitAndAssertVisibleTextMatches('.esChatChnl_about', regex);
       },
 
       addChatMessage: (text: string) => {

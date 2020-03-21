@@ -1248,38 +1248,42 @@ class UserController @Inject()(cc: ControllerComponents, edContext: EdContext)
     // Authorization check: Is a member? Add MemberGetAction?
     request.theMember
 
-    listAllUsersImpl(usernamePrefix, isViaApi = false, request)
+    val json = listAllUsersImpl(usernamePrefix, isViaApi = false, request)
+    OkSafeJson(json)
   }
 
 
   SECURITY // user listing disabled? [8FKU2A4]
-  def listAllUsersPubApi(usernamePrefix: String): Action[Unit] = GetAction { request =>
-    // Ok also if not logged in? So can use from a non-Talkyard client + API secret.
+  def listMembersPubApi(usernamePrefix: String, usersOnly: Boolean)
+        : Action[Unit] = GetAction { request =>
+    // Allowed also if not logged in — so can use from a non-Talkyard client,
+    // without any API secret.
     throwForbiddenIf(!request.siteSettings.enableApi,
       "TyE4305RKCGL4", o"""API not enabled. If you're admin, you can enable it
          in the Admin Area | Settings | Features tab.""")
-    listAllUsersImpl(usernamePrefix, isViaApi = true, request)
+    val json = listAllUsersImpl(usernamePrefix, isViaApi = true, request)
+    OkApiJson(
+      // [PUB_API] Wrap in an obj, so, later on, we can add more things (fields)
+      // to the response, without breaking existing API consumers. E.g. some type of
+      // cursor for iterating through all members.
+      Json.obj(
+        "members" -> json))
   }
 
 
   private def listAllUsersImpl(usernamePrefix: String, isViaApi: Boolean,
-        request: ApiRequest[_]): Result = {
+        request: ApiRequest[_]): JsArray = {
     // Also load deleted anon12345 members. Simpler, and they'll typically be very few or none. [5KKQXA4]
     // ... stop doing that?
     val members = request.dao.loadUsersWithPrefix(usernamePrefix)
-    val result = JsArray(
+    JsArray(
       members map { member =>
-        var json = Json.obj(
+        // [PUB_API] .ts: ListUsersApiResponse, ListGroupsApiResponse, ListMembersApiResponse
+        Json.obj(
           "id" -> member.id,
           "username" -> member.username,
           "fullName" -> member.fullName)
-        if (isViaApi) {
-          json += "extId" -> JsNull // JsString(member.extId)
-          json += "ssoId" -> JsNull // JsString(member.ssoId)
-        }
-        json
       })
-    OkSafeJson(result)
   }
 
 
