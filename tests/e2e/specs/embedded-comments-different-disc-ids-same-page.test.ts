@@ -11,7 +11,6 @@ import settings = require('../utils/settings');
 import make = require('../utils/make');
 import logAndDie = require('../utils/log-and-die');
 import c = require('../test-constants');
-import { disableIncrementalParsing } from 'typescript';
 
 declare let browser: any;
 

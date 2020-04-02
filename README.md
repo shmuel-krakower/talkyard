@@ -1,3 +1,14 @@
+    "wdio-markdown-reporter": "github:carmenmitru/wdio-markdown-reporter",
+    "wdio-cucumber-reporter": "0.0.2",
+    "wdio-json-reporter": "^1.4.0",
+    "wdio-reportportal-reporter": "^6.0.0",
+    "wdio-video-reporter": "^2.0.0"
+    "wdio-mochawesome-reporter": "^3.2.0",
+    "wdio-timeline-reporter": "^5.1.2"
+914 vulnerabilities found - Packages audited: 19310
+Severity: 695 Low | 8 Moderate | 211 High
+Done in 63.29s.
+
 <!--
 Old GitHub one-line description:
 - Discussion forums with Question & Answers and Team Chat features. Plus embedded comments for your blog.

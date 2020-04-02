@@ -11,12 +11,22 @@ import c = require('../test-constants');
 import { logUnusual, logError, logWarning, logMessage,
     logServerRequest, printBoringToStdout, die, dieIf } from './log-and-die';
 
+// '../../../node_modules/@wdio/sync/webdriverio-core.d';
+/// xx reference types="@wdio/sync"/>
 
 //  RENAME  this file, but to what?  E2eBrowser? (RichBrowser like Scala's RichString etc?)
 //  RENAME  waitAndGetSth, waitAndClick... to just getSth, click, etc,
 //          and fns that don't wait, call them  getSthNow  and clickNow  instead,
 //          since almost all fns wait until ok to procceed, so that's the 95% normal
 //          case — then better that those names are brief.
+
+
+type WaitForOptsReverse = {
+  timeout?: number,
+  interval?: number,
+  timeoutMsg?: string,
+  reverse: true,        //  <—— notice
+}
 
 
 // Brekpoint debug help counters, use like so:  if (++ca == 1) debugger;
@@ -85,17 +95,27 @@ function isResponseOk(response): boolean {
 }
 
 
+interface WdioV4BackwCompatBrower extends WebdriverIO.BrowserObject {
+  element: (selector: string) => { value: string };
+  elements: (selector: string) => string[];
+  isVisible: (selector: string) => boolean;
+  waitForVisible: (selector: string, options?: WebdriverIO.WaitForOptions) => boolean;
+  isEnabled: (selector: string) => boolean;
+  isExisting: (selector: string) => boolean;
+  getHTML: (selector: string) => string;
+  getTabIds: () => string[];
+  getCurrentTabId: () => string;
+  switchTab: (newTabId) => void;
+  getLocationInView(selector: string) => any;
+}
+
+
 // There might be many browsers, when using Webdriver.io's multiremote testing, so
 // `browser` is an argument.
 //
-function pagesFor(browser) {
-  const origFrameParent = browser.frameParent;
-  const origWaitForVisible = browser.waitForVisible;
-  const origWaitForEnabled = browser.waitForEnabled;
-  const origWaitForText = browser.waitForText;
-  const origWaitForExist = browser.waitForExist;
-  const origGetText = browser.getText;
-  const origRefresh = browser.refresh;
+function pagesFor(browser: WdioV4BackwCompatBrower) {
+  // The global $ might be for the wrong browser somehow.
+  const $ = browser.$;
 
   const hostsVisited = {};
   let isWhere: IsWhere | U;
@@ -103,6 +123,32 @@ function pagesFor(browser) {
 
   function isOnEmbeddedPage() {
     return isWhere && IsWhere.EmbFirst <= isWhere && isWhere <= IsWhere.EmbLast;
+  }
+
+  browser.element = (selector: string) => {
+    return {
+      value: browser.findElement('css selector', selector)
+    };
+  };
+
+  browser.elements = (selector: string): string[] => {
+    return browser.findElements('css selector', selector);
+  };
+
+  browser.isVisible = (selector: string) => $(selector).isDisplayed();
+  browser.waitForVisible = (s, os): boolean => $(s).waitForDisplayed(os);
+  browser.isEnabled = (selector: string) => $(selector).isEnabled();
+  browser.isExisting = (selector: string) => $(selector).isExisting();
+  browser.getHTML = (selector: string) => $(selector).getHTML();
+  browser.getTabIds = browser.getWindowHandles;
+  browser.getCurrentTabId = browser.getWindowHandle;
+
+  // There's also:  browser.switchWindow(urlOrTitleToMatch: string | RegExp)
+  browser.switchTab = browser.switchToWindow;
+
+  browser.getLocationInView = (selector: string) => {
+    const elemId: string = browser.findElement('css selector', selector);
+    browser.getElementLocationInView(elemId);
   }
 
   const api = {
@@ -117,7 +163,7 @@ function pagesFor(browser) {
     },
 
     _findOrigin: (anyUrl?: string): string => {
-      const url = anyUrl || browser.url().value;
+      const url = anyUrl || browser.getUrl();
       const matches = url.match(/(https?:\/\/[^\/]+)\//);
       if (!matches) {
         throw Error('NoOrigin');
@@ -126,30 +172,26 @@ function pagesFor(browser) {
     },
 
     urlNoHash: (): string => {
-      return browser.url().value.replace(/#.*$/, '');;
+      return browser.getUrl().replace(/#.*$/, '');;
     },
 
     urlPathQueryHash: (): string => {
-      const result = browser.execute(function() {
+      return browser.execute(function() {
         return location.pathname + location.search + location.hash;
       });
-      dieIf(!result || !result.value, 'TyE5ABKRHNS02');
-      return result.value;
     },
 
     urlPath: (): string => {
-      const result = browser.execute(function() {
+      return browser.execute(function() {
         return location.pathname;
       });
-      dieIf(!result || !result.value, 'TyE4RHKS0295');
-      return result.value;
     },
 
 
     // Change all refresh() to refresh2, then remove '2' from name.
     // (Would need to add  waitForPageType: false  anywhere? Don't think so?)
-    refresh2: function() {
-      origRefresh.apply(browser, arguments);
+    refresh2: () => {
+      browser.refresh();
       api.__updateIsWhere();
     },
 
@@ -230,8 +272,8 @@ function pagesFor(browser) {
       // ('ed-comments' is old, deprecated, class name.)
       api.waitForExist('.DW, .talkyard-comments, .ed-comments, .btn');
       isOnEmbeddedCommentsPage =
-          browser.isExisting('.talkyard-comments') ||
-          browser.isExisting('.ed-comments');
+          $('.talkyard-comments').isExisting() ||
+          $('.ed-comments').isExisting();
       isWhere = isOnEmbeddedCommentsPage ? IsWhere.EmbeddingPage : IsWhere.Forum;
     },
 
@@ -267,7 +309,7 @@ function pagesFor(browser) {
       });
       dieIf(!result,
           `Error getting page id, result: ${JSON.stringify(result)} [TyE503KTTHA24]`);
-      return result.value;
+      return result;
     },
 
 
@@ -275,9 +317,9 @@ function pagesFor(browser) {
       const result = browser.execute(function() {
         return window['eds'].siteId;
       });
-      dieIf(!result || _.isNaN(parseInt(result.value)),
+      dieIf(!result || _.isNaN(parseInt(result)),
           "Error getting site id, result: " + JSON.stringify(result));
-      return result.value;  // ? return  parseInt(result.value)  instead ?
+      return result;  // ? return  parseInt(result.value)  instead ?
     },
 
 
@@ -468,7 +510,7 @@ function pagesFor(browser) {
       // Weird, url() returns:
       // {"state":"success","sessionId":"..","hCode":...,"value":"http://server/path","class":"org.openqa.selenium.remote.Response","status":0}
       // is that a bug?
-      api._currentUrl = browser.url().value;
+      api._currentUrl = browser.getUrl();
     },
 
     waitForNewUrl: function() {
@@ -477,10 +519,10 @@ function pagesFor(browser) {
     },
 
     repeatUntilAtNewUrl: function(fn: () => void) {
-      const urlBefore = api.rememberCurrentUrl();
+      const urlBefore = browser.getUrl();
       fn();
       browser.pause(250);
-      while (urlBefore === browser.url().value) {
+      while (urlBefore === browser.getUrl()) {
         // E2EBUG RACE: if the url changes right here, maybe fn() below won't work,
         // will block.
         fn();
@@ -502,10 +544,9 @@ function pagesFor(browser) {
     // Could rename to isInTalkyardIframe.
     // NO, use isWhere instead — just remember in which frame we are, instead of polling. ?
     isInIframe: (): boolean => {
-      const result = browser.execute(function() {
+      return browser.execute(function() {
         return window['eds'] && window['eds'].isInIframe;
       });
-      return result.value;
     },
 
 
@@ -514,9 +555,9 @@ function pagesFor(browser) {
     },
 
 
-    switchToAnyParentFrame: function() {  // arrow fn => `arguments` below won't work
+    switchToAnyParentFrame: () => {
       if (api.isInIframe()) {
-        origFrameParent.apply(browser, arguments);
+        browser.switchToParentFrame();
         logMessage("Switched to parent frame.");
         isWhere = IsWhere.EmbeddingPage;
       }
@@ -527,7 +568,7 @@ function pagesFor(browser) {
       printBoringToStdout(`Switching to frame ${selector}...`);
       api.waitForExist(selector);
       const iframe = browser.element(selector).value;
-      browser.frame(iframe);
+      browser.switchToFrame(iframe); // .frame(iframe);
       printBoringToStdout(` done, now in frame  ${selector}.\n`);
     },
 
@@ -606,32 +647,35 @@ function pagesFor(browser) {
 
 
     getRectOfFirst: (selector): ElemRect => {
-      const items = browser.elements(selector).value;
+      const items = browser.elements(selector);
       assert(items.length >= 1, `${items.length} elems matches ${selector}, should be at least one`);
-      const elemId = items[0].ELEMENT;
-      const rect = browser.elementIdRect(elemId).value;   // or getElementRect? Webdriver v5?
+      const elemId = items[0];//.ELEMENT;
+      
+      //const rect = browser.elementIdRect(elemId).value;
+      const rect = browser.getElementRect(elemId);
       logMessage(`getRect('${selector}') —> ${JSON.stringify(rect)}`);
       return rect;
     },
 
 
     getWindowHeight: (): number => {
-       // Webdriver.io v5, just this?: return browser.getWindowRect().height
+       // Webdriver.io v5, just this?:
+      // return browser.getWindowRect().height
       const result = browser.execute(function() {
         return window.innerHeight;
       });
-      dieIf(!result || !result.value, 'TyE7WKJP42');
-      return result.value;
+      dieIf(!result, 'TyE7WKJP42');
+      return result;
     },
 
 
     getPageScrollY: (): number => {
-      const result = browser.execute(function() {
+      return browser.execute(function(): number {
         var pageColumn = document.getElementById('esPageColumn');
+        // ?? this works inside execute()?
         if (!pageColumn) throw Error("No #esPageColumn on this page [TyE7KBAQ2]");
         return pageColumn.scrollTop;
       });
-      return parseInt(result.value);
     },
 
 
@@ -643,7 +687,7 @@ function pagesFor(browser) {
         var elem = document.querySelector(selector);
         return pageColumn.contains(elem);
       }, selector);
-      if (isInPageColResult.value) {
+      if (isInPageColResult) {
         api._real_scrollIntoViewInPageColumn(selector);
       }
       else {
@@ -684,44 +728,55 @@ function pagesFor(browser) {
 
     scrollToTop: function() {
       // Sometimes, the browser won't scroll to the top. Who knows why. So try twice.
-      utils.tryManyTimes('ScrollTop', 2, () => {
-        // I think some browsers wants to scroll <body> others want to scroll <html>, so do both.
-        // And if we're viewing a topic, need to scroll the page column insetad.  (4ABKW20)
-        browser.scroll('body', 0, 0);
-        browser.scroll('html', 0, 0);
-        if (browser.isVisible('#esPageColumn')) {
-          // Doesn't work: browser.scroll('#esPageColumn', 0, 0);
-          // Instead:
-          browser.execute(function() {
-            document.getElementById('esPageColumn').scrollTop = 0;
-          });
-        }
+      utils.tryManyTimes('scrollToTop', 2, () => {
+        // // I think some browsers wants to scroll <body> others want to scroll <html>, so do both.
+        // // And if we're viewing a topic, need to scroll the page column insetad.  (4ABKW20)
+        // browser.scroll('body', 0, 0);
+        // browser.scroll('html', 0, 0);
+        browser.execute(function() {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0; // not needed? but why not
+          // If we're on a Talkyard page, scroll to its top.
+          var pageElem = document.getElementById('esPageColumn');
+          if (pageElem) pageElem.scrollTop = 0;
+        });
+
         // Need to wait for the scroll to actually happen, otherwise Selenium/Webdriver
         // continues running subsequent test steps, without being at the top.
         let scrollTops;
         browser.waitUntil(() => {
-          const result = browser.execute(function() {
+          scrollTops = browser.execute(function() {
             return ('' +
                 document.body.scrollTop + ',' +
                 document.documentElement.scrollTop + ',' + (
                   document.getElementById('esPageColumn') ?
                     document.getElementById('esPageColumn').scrollTop : 0));
           });
-          scrollTops = result.value;
           return scrollTops === '0,0,0';
-        }, 1000, `Couldn't scroll to top, scrollTops: ${scrollTops}`);
+        }, {
+          timeout: 1000,
+          timeoutMsg: `Couldn't scroll to top, scrollTops: ${scrollTops}`,
+        });
       });
     },
 
 
     scrollToBottom: function() {
-      browser.scroll('body', 0, 999*1000);
-      browser.scroll('html', 0, 999*1000);
-      if (browser.isVisible('#esPageColumn')) {
-        browser.execute(function() {
-          document.getElementById('esPageColumn').scrollTop = 999*1000;
-        });
-      }
+      //browser.scroll('body', 0, 999*1000);
+      //browser.scroll('html', 0, 999*1000);
+      //if (browser.isVisible('#esPageColumn')) {
+      //  browser.execute(function() {
+      //    document.getElementById('esPageColumn').scrollTop = 999*1000;
+      //  });
+      //}
+      browser.execute(function() {
+        window.scrollTo(0, 999*1000);
+        document.documentElement.scrollTop = 999*1000; // not needed? but why not
+        // If we're on a Talkyard page, scroll to its bottom too.
+        var pageElem = document.getElementById('esPageColumn');
+        if (pageElem) pageElem.scrollTop = 999*1000;
+      });
+
       // Need to wait for the scroll to actually happen. COULD instead maybe
       // waitUntil scrollTop = document height - viewport height?  but will probably be
       // one-pixel-too-litle-too-much errors? For now:
@@ -730,7 +785,7 @@ function pagesFor(browser) {
 
 
     clickBackdrop: () => {
-      browser.waitAndClick('.fade.in.modal');
+      api.waitAndClick('.fade.in.modal');
     },
 
 
@@ -761,6 +816,10 @@ function pagesFor(browser) {
     waitUntilDoesNotMove: function(buttonSelector: string, pollInterval?: number) {
       for (let attemptNr = 1; attemptNr <= 30; ++attemptNr) {
         let location = browser.getLocationInView(buttonSelector);
+
+console.log(`location: ${JSON.stringify(location)}   <— ???`);
+die("untested  TyE206549432w46")
+
         browser.pause(pollInterval || 50);
         let locationLater = browser.getLocationInView(buttonSelector);
         if (location.y === locationLater.y && location.x === locationLater.x)
@@ -771,19 +830,21 @@ function pagesFor(browser) {
 
 
     count: (selector: string): number => {
-      const elems = browser.elements(selector).value;
+      const elems = browser.elements(selector);
       return elems.length;
     },
 
+    isVisible: (selector: string) => $(selector).isDisplayed(),
 
     // Make `api.waitForVisible()` work in this file — I'd forget to do: `browser.waitForVisible()`.
-    waitForVisible: function(selector: string, timeoutMillis?: number) {
-      origWaitForVisible.apply(browser, arguments);
+    waitForVisible: function(selector: string, options?: WebdriverIO.WaitForOptions) {
+      $(selector).waitForDisplayed(options);
+      // origWaitForVisible.apply(browser, arguments);timeoutMillis?: number
     },
 
     waitForNotVisible: function(selector: string, timeoutMillis?: number) {
       for (let elapsed = 0; elapsed < timeoutMillis || true ; elapsed += PollMs) {
-        if (!browser.isVisible(selector))
+        if (!$(selector).isDisplayed())
           return;
         browser.pause(PollMs);
       }
@@ -796,12 +857,16 @@ function pagesFor(browser) {
       */
     },
 
-    waitForEnabled: function(selector: string, timeoutMillis?: number) {
-      origWaitForEnabled.apply(browser, arguments);
+    waitForEnabled: function(selector: string, options?: WebdriverIO.WaitForOptions) {
+      $(selector).waitForEnabled(options)
+      // origWaitForEnabled.apply(browser, arguments);
     },
 
-    waitForText: function(selector: string, timeoutMillis?: number) {
-      origWaitForText.apply(browser, arguments);
+    waitForText: function(selector: string, options?: WebdriverIO.WaitForOptions) {
+      browser.waitUntil(
+        () => !!$(selector).getText(),
+        options)
+      // origWaitForText.apply(browser, arguments);
     },
 
     getWholePageJsonStrAndObj: (): [string, any] => {
@@ -820,7 +885,7 @@ function pagesFor(browser) {
     },
 
     waitUntilValueIs: function(selector: string, value: string) {
-      browser.waitForVisible(selector);
+      api.waitForVisible(selector);
       while (true) {
         const currentValue = browser.getValue(selector);
         if (currentValue === value)
@@ -829,13 +894,16 @@ function pagesFor(browser) {
       }
     },
 
-    waitForExist: function(selector: string, timeoutMillis?: number) {
-      origWaitForExist.apply(browser, arguments);
+    waitForExist: function(selector: string, options?: WebdriverIO.WaitForOptions) {
+      $(selector).waitForExist(options)
+      //origWaitForExist.apply(browser, arguments);
     },
 
-    waitForGone: function(selector: string, timeoutMillis?: number) {
-      // True reverses, i.e. wait until not visible
-      origWaitForExist.call(browser, selector, timeoutMillis, true);
+    waitForGone: function(selector: string, options: WaitForOptsReverse = { reverse: true }) {
+      // True reverses, i.e. wait until not exists.
+      options.reverse = true;
+      $(selector).waitForExist(options)
+      //origWaitForExist.call(browser, selector, timeoutMillis, true);
     },
 
     waitAndClick: function(selector: string,
@@ -864,6 +932,7 @@ function pagesFor(browser) {
       if (selector[0] !== '#' && !opts.clickFirst) {
         let errors = '';
         let length = 1;
+        die("unimpl v5:  byBrowser  TyE402TKSH74");
         const byBrowserResults = byBrowser(browser.elements(selector));
         _.forOwn(byBrowserResults, (result, browserName) => {
           const elems = result.value;
@@ -893,7 +962,7 @@ function pagesFor(browser) {
     waitAndClickNth: function(selector, n) {   // BUG will only scroll the 1st elem into view [05YKTDTH4]
       assert(n !== 0, "n starts on 1, change from 0 to 1 please");
       api._waitForClickable(selector);
-      const items = browser.elements(selector).value;
+      const items = browser.elements(selector);
       assert(items.length >= n, `Elem ${n} missing: Only ${items.length} elems match: ${selector}`);
       let response;
       if (n > 0) {
@@ -960,12 +1029,12 @@ function pagesFor(browser) {
     },
 
 
-    waitUntilGone: function(what) {
-      browser.waitUntil(function () {
-        const resultsByBrowser = browser.isVisible(what);
+    waitUntilGone: function(what: string) {   // RENAME to waitUntilCannotSee ?
+      browser.waitUntil(() => !$(what).isDisplayed());
+        /*
+        const resultsByBrowser = api.isVisible(what);
         const values = allBrowserValues(resultsByBrowser);
-        return _.every(values, x => !x );
-      });
+        return _.every(values, x => !x ); */
     },
 
     refreshUntil: (test: () => boolean) => {
@@ -1030,7 +1099,7 @@ function pagesFor(browser) {
 
     waitUntilElementNotOccluded: (selector: string, opts: { okayOccluders?: string } = {}) => {
       for (let i = 0; i < 9999; ++i) {
-        const result = browser.execute(function(selector, okayOccluders) {
+        const result = browser.execute(function(selector, okayOccluders): boolean | string {
           var elem = document.querySelector(selector);
           var rect = elem.getBoundingClientRect();
           var middleX = rect.left + rect.width / 2;
@@ -1075,20 +1144,24 @@ function pagesFor(browser) {
           return elemIdClass + maybeWeird;
         }, selector, opts.okayOccluders);
 
-        dieIf(!result, "Error checking if elem interactable, result: " + JSON.stringify(result));
-        if (result.value === true) {
+        dieIf(!_.isBoolean(result) && !_.isString(result),
+            `Error checking if elem interactable, result: ${ JSON.stringify(result) }`);
+
+        if (result === true) {
           if (i >= 1) {
             logMessage(`Fine, elem [ ${selector} ] no longer occluded. Continuing`)
           }
           break;
         }
-        logMessage(`Waiting for elem [ ${selector} ] to not be occluded by [ ${result.value} ]...`)
+
+        logMessage(`Waiting for elem [ ${selector} ] to not be occluded by [ ${result} ]...`)
         browser.pause(200);
       }
     },
 
     waitForAtLeast: function(num, selector) {
       browser.waitUntil(function () {
+        die("unimpl v5:  byBrowser  TyE570267");
         const elemsList = allBrowserValues(browser.elements(selector));
         return _.every(elemsList, (elems) => {
           return count(elems) >= num;
@@ -1105,6 +1178,7 @@ function pagesFor(browser) {
 
     assertExactly: function(num, selector) {
       let errorString = '';
+      die("unimpl v5:  byBrowser  TyE30675RSKUSD3");
       let resultsByBrowser = byBrowser(browser.elements(selector));
       _.forOwn(resultsByBrowser, (result, browserName) => {
         if (result.value.length !== num) {
@@ -1162,13 +1236,17 @@ function pagesFor(browser) {
           //  https://github.com/webdriverio/webdriverio/issues/3024#issuecomment-542888255
           // Instead, delete any previous text (hit backspace 9999 times), before typing
           // the new value.
-          const oldValue = browser.getValue(selector);
+          const elem = $(selector);
+          const oldValue = elem.getValue();
           if (opts.append) {
-            browser.addValue(selector, value);
+            elem.addValue(value);
           }
           else {
             // DO_AFTER 2019-07-01, no, Webdriverio v5: see if this Chrome weirdness workaround is still needed.
-            browser.setValue(selector, '\uE003'.repeat(oldValue.length) + value);
+            //elem.setValue('\uE003'.repeat(oldValue.length) + value);
+            // Now this works?:
+            elem.setValue(value);
+
             // Try this:  — but causes this error:
             //  """Error: The requested resource could not be found,
             //   or a request was received using an HTTP method that is
@@ -1183,7 +1261,7 @@ function pagesFor(browser) {
             break;
           }
           browser.pause(200);
-          const valueReadBack = browser.getValue(selector);
+          const valueReadBack = elem.getValue();
           if (('' + value) === valueReadBack) {
             break;
           }
@@ -1230,7 +1308,7 @@ function pagesFor(browser) {
 
 
     waitUntilHtmlMatches: function(selector, regexOrStr: string | RegExp | any[]) {
-      browser.waitForExist(selector);
+      api.waitForExist(selector);
 
       for (let i = 0; true; ++i) {
         const html = browser.getHTML(selector);
@@ -1298,10 +1376,7 @@ function pagesFor(browser) {
       // a stale elem ref in an ok harmless way, apparently breaks the test.
       const startMs = Date.now();
       for (let pauseMs = PollMs; true; pauseMs *= PollExpBackoff) {
-        const elemsWrap = browser.elements(selector);
-        dieIf(!elemsWrap.value,
-            "No value. Many browsers specified? Like 'everyone.sth(..)'? Not implemented. [TyE5KJ7W1]");
-        const elems = elemsWrap.value;
+        const elems = browser.elements(selector);
         let texts = '';
         for (let i = 0; i < elems.length; ++i) {
           const elem = elems[i];
@@ -1329,18 +1404,19 @@ function pagesFor(browser) {
     },
 
 
-    waitAndGetText: function(selector: string): string {
+    waitAndGetText: (selector: string): string => {
       // Maybe not visible, if empty text? So use  waitForExist() here — and,
       // in waitAndGetVisibleText() just below, we waitForVisible() instead.
       api.waitForExist(selector);
-      return origGetText.apply(browser, arguments);
+      return $(selector).getText();
+      //return origGetText.apply(browser, arguments);
     },
 
 
-    waitAndGetVisibleText: function(selector) {
+    waitAndGetVisibleText: (selector): string => {
       api.waitForVisible(selector);
       api.waitForText(selector);
-      return browser.getText(selector);
+      return $(selector).getText();
     },
 
 
@@ -1364,7 +1440,7 @@ function pagesFor(browser) {
         regex2 = new RegExp(regex2);
       }
       assert(n >= 1, "n starts on 1, change from 0 to 1 please");
-      const items = browser.elements(selector).value;
+      const items = browser.elements(selector);
       assert(items.length >= n, `Elem ${n} missing: Only ${items.length} elems match: ${selector}`);
       const response = browser.elementIdText(items[n - 1].ELEMENT);
       assert(isResponseOk(response), "Bad response._status: " + response._status +
@@ -1385,7 +1461,7 @@ function pagesFor(browser) {
     // Also see:  assertNthTextMatches
     assertNthClassIncludes: function(selector, n, classToFind) {
       assert(n >= 1, "n starts on 1, change from 0 to 1 please");
-      const items = browser.elements(selector).value;
+      const items = browser.elements(selector);
       assert(items.length >= n, `Elem ${n} missing: Only ${items.length} elems match: ${selector}`);
       const response = browser.elementIdAttribute(items[n - 1].ELEMENT, 'class');
       assert(isResponseOk(response), "Bad response._status: " + response._status +
@@ -1464,7 +1540,7 @@ function pagesFor(browser) {
         assert(shallMatch, `two regexps only supported if shallMatch = true`);
         regex2 = new RegExp(regex2);
       }
-      const elems = browser.elements(selector).value;
+      const elems = browser.elements(selector);
       // If many browsers, we got back {browserName: ...., otherBrowserName: ...} instead.
       assert(elems, `assertAnyOrNoneMatches with many browsers at a time not implemented [EdE4KHA2QU]`);
       assert(!shallMatch || elems.length, `No elems found matching ` + selector);
@@ -1495,7 +1571,7 @@ function pagesFor(browser) {
     waitUntilIsOnHomepage: function() {
       let delay = 20;
       while (true) {
-        const url = browser.url().value;
+        const url = browser.getUrl();
         if (/https?:\/\/[^/?#]+(\/latest|\/top|\/)?(#.*)?$/.test(url)) {
           break;
         }
@@ -1521,7 +1597,7 @@ function pagesFor(browser) {
 
     assertPageHtmlSourceMatches_1: function(toMatch) {
       // _1 = only for 1 browser
-      const source = browser.getSource();
+      const source = browser.getPageSource();
       let regex = _.isString(toMatch) ? new RegExp(toMatch) : toMatch;
       assert(regex.test(source), "Page source does match " + regex);
     },
@@ -1534,7 +1610,7 @@ function pagesFor(browser) {
       // _1 = only for 1 browser
       let regex = _.isString(toMatch) ? new RegExp(toMatch) : toMatch;
       while (true) {
-        const source = browser.getSource();
+        const source = browser.getPageSource();
         const matches = regex.test(source);
         if (matches)
           return;
@@ -1544,7 +1620,7 @@ function pagesFor(browser) {
 
 
     assertPageHtmlSourceDoesNotMatch: function(toMatch) {
-      let resultsByBrowser = byBrowser(browser.getSource());
+      let resultsByBrowser = byBrowser(browser.getPageSource());
       let regex = _.isString(toMatch) ? new RegExp(toMatch) : toMatch;
       _.forOwn(resultsByBrowser, (text, browserName) => {
         assert(!regex.test(text), browserNamePrefix(browserName) + "Page source does match " + regex);
@@ -1556,7 +1632,7 @@ function pagesFor(browser) {
 
     // Also see browser.pageTitle.assertPageHidden().  Dupl code [05PKWQ2A]
     assertWholePageHidden: function() {
-      let resultsByBrowser = byBrowser(browser.getSource());
+      let resultsByBrowser = byBrowser(browser.getPageSource());
       _.forOwn(resultsByBrowser, (text: any, browserName) => {
         if (settings.prod) {
           assert(api._pageNotFoundOrAccessDenied.test(text),
@@ -1571,7 +1647,7 @@ function pagesFor(browser) {
 
     // Also see api.pageTitle.assertPageHidden().  Dupl code [05PKWQ2A]
     assertMayNotSeePage: function() {
-      let resultsByBrowser = byBrowser(browser.getSource());
+      let resultsByBrowser = byBrowser(browser.getPageSource());
       _.forOwn(resultsByBrowser, (text: any, browserName) => {
         if (settings.prod) {
           assert(api._pageNotFoundOrAccessDenied.test(text),
@@ -1597,7 +1673,7 @@ function pagesFor(browser) {
 
     assertNotFoundError: function() {
       for (let i = 0; i < 20; ++i) {
-        let source = browser.getSource();
+        let source = browser.getPageSource();
         // The //s regex modifier makes '.' match newlines. But it's not available before ES2018.
         let is404 = /404 Not Found.+TyE404_/s.test(source);
         if (!is404) {
@@ -1612,7 +1688,7 @@ function pagesFor(browser) {
 
 
     assertUrlIs: function(expectedUrl) {
-      let url = browser.url().value;
+      let url = browser.getUrl();
       assert(url === expectedUrl);
     },
 
@@ -1655,8 +1731,8 @@ function pagesFor(browser) {
       const result = browser.execute(function() {
         return window['debiki2'].Server.testGetLongPollingNr();
       });
-      dieIf(!result, "Error getting long polling count, result: " + JSON.stringify(result));
-      const count = parseInt(result.value);
+      dieIf(!_.isNumber(result), "Error getting long polling count, result: " + JSON.stringify(result));
+      const count = result; // parseInt(result);
       dieIf(_.isNaN(count), "Long polling count is weird: " + JSON.stringify(result));
       return count;
     },
@@ -2214,7 +2290,7 @@ function pagesFor(browser) {
       assertUserPresent: function(username: string) {
         api.waitForVisible('.esCtxbar_onlineCol');
         api.waitForVisible('.esCtxbar_list .esAvtrName_username');
-        var elems = browser.elements('.esCtxbar_list .esAvtrName_username').value;
+        var elems = browser.elements('.esCtxbar_list .esAvtrName_username');
         var usernamesPresent = elems.map((elem) => {
           return browser.elementIdText(elem.ELEMENT).value;
         });
@@ -2261,7 +2337,7 @@ function pagesFor(browser) {
       },
 
       clickSingleSignOnButton: () => {
-        browser.waitAndClick('.s_LD_SsoB');
+        api.waitAndClick('.s_LD_SsoB');
       },
 
       waitForSingleSignOnButton: () => {
@@ -2803,7 +2879,7 @@ function pagesFor(browser) {
               api.waitAndClick('#oauth__auth-form__submit-btn');
             }
             else {
-              const url = browser.url().value;
+              const url = browser.getUrl();
               if (url.indexOf('linkedin.com') === -1) {
                 logMessage("Didn't need to click any Allow button: Left linkedin.com");
                 break;
@@ -3631,7 +3707,7 @@ function pagesFor(browser) {
       postBodySelector: (postNr: PostNr) => `#post-${postNr} .dw-p-bd`,
 
       forAllPostIndexNrElem: (fn: (index: number, postNr: PostNr, elem) => void) => {
-        const postElems = browser.elements('[id^="post-"]').value;
+        const postElems = browser.elements('[id^="post-"]');
         for (let index = 0; index < postElems.length; ++index) {
           const elem = postElems[index];
           const idAttr = browser.elementIdAttribute(elem.ELEMENT, 'id').value;
@@ -3730,7 +3806,7 @@ function pagesFor(browser) {
         // Replace other dupl code with this fn.  [59SKEDT0652]
         api.switchToEmbCommentsIframeIfNeeded();
         api.waitForVisible(selector);
-        const postElems = browser.elements(selector).value;
+        const postElems = browser.elements(selector);
         for (let i = 0; i < expectedPostNrs.length; ++i) {
           const expectedNr = expectedPostNrs[i];
           const elem = postElems[i];
@@ -3924,7 +4000,7 @@ function pagesFor(browser) {
             api.topic.clickMoreForPostNr(postNr);
           }
           api.waitAndClick('.s_PA_MvB', { timeoutMs: 500 });
-          api.waitForVisible('.s_MvPD', 500);
+          api.waitForVisible('.s_MvPD', { timeout: 500 });
         });
       },
 
@@ -4236,7 +4312,7 @@ function pagesFor(browser) {
         //
         // Why try twice? The scroll buttons aren't shown until a few 100 ms after page load.
         // So, `browser.isVisible(api.scrollButtons.fixedBarSelector)` might evaluate to false,
-        // and then we won't scroll down — but then just before `browser.waitAndClick`
+        // and then we won't scroll down — but then just before `api.waitAndClick`
         // they appear, so the click fails. That's why we try once more.
         //
         api.waitForVisible(buttonSelector);
@@ -4257,7 +4333,7 @@ function pagesFor(browser) {
             const buttonRect = api.getRectOfFirst(buttonSelector);
 
             // E.g. the admin area, /-/admin.
-            const isOnAutoPage = browser.url().value.indexOf('/-/') >= 0;
+            const isOnAutoPage = browser.getUrl().indexOf('/-/') >= 0;
 
             /*
             // ? Why did I add this can-scroll test ? Maybe, if can *not* scroll, this loop never got
@@ -4331,7 +4407,7 @@ function pagesFor(browser) {
       },
 
       _isOrigPostBodyVisible: function() {
-        return !!browser.getText('#post-1 > .dw-p-bd');
+        return !!$('#post-1 > .dw-p-bd').getText();
       },
 
       _isTitlePendingApprovalVisible: function() {
@@ -4415,10 +4491,10 @@ function pagesFor(browser) {
 
       deleteChatMessageNr: (nr: PostNr) => {
         const postSelector = `#post-${nr}`;
-        browser.waitAndClick(`${postSelector} .s_C_M_B-Dl`);
-        browser.waitAndClick('.dw-delete-post-dialog .e_YesDel');
-        browser.waitUntilLoadingOverlayGone();
-        browser.waitForVisible(`${postSelector}.s_C_M-Dd`);
+        api.waitAndClick(`${postSelector} .s_C_M_B-Dl`);
+        api.waitAndClick('.dw-delete-post-dialog .e_YesDel');
+        api.waitUntilLoadingOverlayGone();
+        api.waitForVisible(`${postSelector}.s_C_M-Dd`);
       },
     },
 
@@ -4489,7 +4565,7 @@ function pagesFor(browser) {
       },
 
       countNumPagesFound_1: function(): number {
-        return browser.elements('.esSERP_Hit_PageTitle').value.length;
+        return browser.elements('.esSERP_Hit_PageTitle').length;
       },
 
       assertResultPageTitlePresent: (title: string) => {
@@ -4841,12 +4917,12 @@ function pagesFor(browser) {
 
       draftsEtc: {
         waitUntilLoaded: function() {
-          browser.waitForExist('.s_Dfs');
+          api.waitForExist('.s_Dfs');
         },
 
         refreshUntilNumDraftsListed: function(numDrafts: number) {
           while (true) {
-            const elems = browser.elements('.s_Dfs_Df').value;
+            const elems = browser.elements('.s_Dfs_Df');
             if (elems.length === numDrafts)
               return;
             browser.pause(125);
@@ -5199,7 +5275,7 @@ function pagesFor(browser) {
       },
 
       numTabsVisible: () => {
-        const elems = browser.elements('.esAdminArea .dw-main-nav > li').value;
+        const elems = browser.elements('.esAdminArea .dw-main-nav > li');
         return elems.length;
       },
 
@@ -5810,7 +5886,7 @@ function pagesFor(browser) {
           const pageIdPostNrSelector = '.e_Pg-Id-' + pageId + '.e_P-Nr-' + postNr;
           const waitingSelector = opts.waiting ? '.e_Wtng' : '.e_NotWtng';
           const selector = '.esReviewTask' + pageIdPostNrSelector + waitingSelector;
-          const elems = browser.elements(selector).value;
+          const elems = browser.elements(selector);
           logMessage(`Counted to ${elems.length} of these: ${selector}`);
           return elems.length;
         },
@@ -5829,7 +5905,7 @@ function pagesFor(browser) {
 
         // RENAME to countReviewTasks? and add countReviewTasksWaiting?
         countThingsToReview: function(): number {
-          const elems = browser.elements('.esReviewTask_it').value;
+          const elems = browser.elements('.esReviewTask_it');
           return elems.length;
         },
 
@@ -5953,14 +6029,14 @@ function pagesFor(browser) {
       },
 
       countNumInvited: () => {
-        return browser.elements('.s_InvsL_It').value.length;
+        return browser.elements('.s_InvsL_It').length;
       },
     },
 
 
     apiV0: {
       loginWithSecret: (ps: { origin: string, oneTimeSecret: string, thenGoTo: string }): void => {
-        browser.go(ps.origin +
+        api.go(ps.origin +
             `/-/v0/login-with-secret?oneTimeSecret=${ps.oneTimeSecret}&thenGoTo=${ps.thenGoTo}`);
       },
     },
@@ -5968,9 +6044,9 @@ function pagesFor(browser) {
 
     unsubscribePage: {
       confirmUnsubscription: () => {
-        browser.rememberCurrentUrl();
-        browser.waitAndClick('input[type="submit"]');
-        browser.waitForNewUrl();
+        api.rememberCurrentUrl();
+        api.waitAndClick('input[type="submit"]');
+        api.waitForNewUrl();
         browser.waitForVisible('#e2eBeenUnsubscribed');
       },
     },
@@ -5978,7 +6054,7 @@ function pagesFor(browser) {
 
     changePasswordDialog: {
       clickYesChange: () => {
-        browser.waitAndClick('.esStupidDlg .btn-primary');
+        api.waitAndClick('.esStupidDlg .btn-primary');
       },
     },
 
@@ -6189,7 +6265,7 @@ function pagesFor(browser) {
     complex: {
       waitUntilLoggedIn: () => {
         browser.waitUntil(function () {
-          const result = browser.execute(function() {
+          return browser.execute(function() {
             try {
               return window['debiki2'].ReactStore.getMe().isLoggedIn;
             }
@@ -6197,7 +6273,6 @@ function pagesFor(browser) {
               return false;
             }
           });
-          return result.value;
         });
 
         if (api.metabar.isVisible()) {
@@ -6420,7 +6495,7 @@ function pagesFor(browser) {
           api.topic.clickReplyToPostNr(postNr);
           try {
             if (opts.isEmbedded) api.switchToEmbeddedEditorIrame();
-            api.waitForVisible('.esEdtr_textarea', 5000);
+            api.waitForVisible('.esEdtr_textarea', { timeout: 5000 });
             break;
           }
           catch (ignore) {

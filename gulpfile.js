@@ -323,23 +323,26 @@ const nextFileTemplate = function(contents, file) {
 //  End-to-end Tests
 // ========================================================================
 
+const e2eTestsTypescriptProject = typeScript.createProject("tests/e2e/tsconfig.json");
 
 gulp.task('clean-e2e', () => {
   return del(['target/e2e/**/*']);
 });
 
 gulp.task('compile-e2e-scripts', () => {
-  var stream = gulp.src([
-        'client/app-slim/constants.ts',
-        'client/app-slim/model.ts',
-        'tests/e2e/**/*ts'])
+  const stream = e2eTestsTypescriptProject.src()
+      // gulp.src([
+      //   'client/app-slim/constants.ts',
+      //   'client/app-slim/model.ts',
+      //   'tests/e2e/**/*ts']) 
       .pipe(plumber())
-      .pipe(typeScript({
-        declarationFiles: true,
-        module: 'commonjs',
-        lib: ['es5', 'es2015', 'dom'],
-        types: ['lodash', 'core-js', 'assert', 'node']
-      }));
+      .pipe(e2eTestsTypescriptProject());
+      //typeScript({
+      //  declarationFiles: true,
+      //  module: 'commonjs',
+      //  lib: ['es5', 'es2015', 'dom'],
+      //  types: ['lodash', 'core-js', 'assert', 'node']
+      //})
   // stream.dts.pipe(gulp.dest('target/e2e/...')); — no, don't need d.ts files
 
   return stream.js

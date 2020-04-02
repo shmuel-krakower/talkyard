@@ -68,7 +68,7 @@ else {
 }
 
 
-const api = { config: {
+const config: WebdriverIO.Config = {
 
   // Don't want the annoying warning that 'elementIdLocationInView' will be gone soon.
   deprecationWarnings: false,
@@ -174,7 +174,29 @@ const api = { config: {
   // Services take over a specfic job you don't want to take care of. They enhance
   // your test setup with almost no self effort. Unlike plugins they don't add new
   // commands but hook themself up into the test process.
-  // services: ['sauce'],
+  // services: [
+  //   'sauce',
+  //
+  //    // https://webdriver.io/docs/wdio-chromedriver-service.html
+  //    // Would need to install Chromedriver: npm install chromedriver --save-dev
+  //   'wdio-chromedriver-service',
+  //
+  //   // https://webdriver.io/docs/static-server-service.html
+  //   'static-server',
+  //
+  //   // https://webdriver.io/docs/selenium-standalone-service.html
+  //   'selenium-standalone',
+  //
+  //   // https://webdriver.io/docs/devtools-service.html
+  //   'devtools',
+  //
+  //   // https://webdriver.io/docs/firefox-profile-service.html
+  //   'firefox-profile',
+  //
+  //   // https://webdriver.io/docs/wdio-docker-service.html
+  //   'docker',
+  //
+  //   'intercept'],
 
   // Framework you want to run your specs with.
   // The following are supported: mocha, jasmine and cucumber
@@ -182,13 +204,15 @@ const api = { config: {
 
   // Make sure you have the wdio adapter package for the specific framework installed
   // before running any tests.
-  framework: 'mocha',
+  //framework: 'mocha',
+  framework: 'jasmine',
 
   // Test reporter for stdout.
   // The following are supported: dot (default), spec and xunit
   // see also: http://webdriver.io/guide/testrunner/reporters.html
   //reporters: ['dot'],
-  reporters: [progressReporter],
+  //reporters: [progressReporter],
+  reporters: ['spec'],
 
   // Options to be passed to Mocha.
   // See the full list at http://mochajs.org/
@@ -291,6 +315,6 @@ const api = { config: {
   // possible to defer the end of the process using a promise.
   // onComplete: function(exitCode) {
   // }
-}};
+};
 
-export = api;
+export { config };

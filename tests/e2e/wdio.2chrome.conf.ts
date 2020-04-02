@@ -7,14 +7,10 @@ const defCaps = config.capabilities[0];
 // at the same time, e.g. two browsers typing different chat messages to each other.
 config.capabilities = {
   browserA: {
-    desiredCapabilities: {
-      ...defCaps
-    }
+    capabilities: { ...defCaps }
   },
   browserB: {
-    desiredCapabilities: {
-      ...defCaps
-    }
+    capabilities: { ...defCaps }
   }
 };
 
