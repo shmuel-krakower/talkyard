@@ -20,8 +20,8 @@ package ed.server.security
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.{EdHttp, Globals}
-import ed.server.http.{DebikiRequest, JsonOrFormDataBody}
-import play.api.mvc.{Cookie, DiscardingCookie, Request}
+import ed.server.http.JsonOrFormDataBody
+import play.api.mvc.{Cookie, DiscardingCookie, RequestHeader}
 import scala.util.Try
 import EdSecurity._
 import ed.server.auth.MayMaybe
@@ -152,8 +152,8 @@ class EdSecurity(globals: Globals) {
    * (No cookies should be set if the response might be cached by a proxy
    * server.)
    */
-  def checkSidAndXsrfToken(request: play.api.mvc.Request[_], siteId: SiteId,
-        expireIdleAfterMins: Long, maySetCookies: Boolean)
+  def checkSidAndXsrfToken[A](request: RequestHeader, anyRequestBody: Option[A],
+        siteId: SiteId, expireIdleAfterMins: Long, maySetCookies: Boolean)
         : (SidStatus, XsrfOk, List[Cookie]) = {
 
     val expireIdleAfterMillis: Long = expireIdleAfterMins * MillisPerMinute
@@ -186,6 +186,7 @@ class EdSecurity(globals: Globals) {
           }
           else if (!maySetCookies) {
             // No XSRF token available, and none needed, since this a GET request. [2WKA40]
+            // BUT WHAT ABOUT WEBSOCKETS? [WS] then good to require xsrf token?
             // Also, this makes [privacy-badger] happy. [NOCOOKIES]
             // Could set the xsrf token to any xsrf header value? But then ought to check if
             // it's been properly crypto hash signed — would be better to avoid (don't want to
@@ -210,8 +211,8 @@ class EdSecurity(globals: Globals) {
         // There must be an xsrf token in a certain header, or in a certain
         // input in any POST:ed form data. Check the header first, in case
         // this is a JSON request (then there is no form data).
-        var xsrfToken = request.headers.get(XsrfTokenHeaderName) orElse {
-          request.body match {
+        val xsrfToken = request.headers.get(XsrfTokenHeaderName) orElse {
+          if (anyRequestBody.isEmpty) None else anyRequestBody.get match {
             case params: Map[String, Seq[String]] =>
               params.get(XsrfTokenInputName).map(_.head)
             case body: JsonOrFormDataBody =>
@@ -599,10 +600,10 @@ class EdSecurity(globals: Globals) {
   /** Extracts any browser id cookie from the request, or creates it if absent
     * and is a POST request.
     */
-  def getBrowserIdCookieMaybeCreate(request: Request[_]): (Option[BrowserId], List[Cookie]) = {
-    val anyBrowserIdCookieValue = getAnyBrowserIdCookieValue(request)
-    if (anyBrowserIdCookieValue.isDefined) {
-      (Some(BrowserId(anyBrowserIdCookieValue.get, isNew = false)), Nil)
+  def getBrowserIdCreateCookieIfMissing(request: RequestHeader): (Option[BrowserId], List[Cookie]) = {
+    val anyBrowserId = getAnyBrowserId(request)
+    if (anyBrowserId.isDefined) {
+      (Some(anyBrowserId.get), Nil)
     }
     else if (request.method == "GET" || request.method == "OPTIONS" || request.method == "HEAD") {
       // Probably harmless, don't need to remember the browser.
@@ -615,8 +616,10 @@ class EdSecurity(globals: Globals) {
     }
   }
 
-  def getAnyBrowserIdCookieValue(request: Request[_]): Option[String] =
-    request.cookies.get(BrowserIdCookieName).map(_.value)
+  def getAnyBrowserId(request: RequestHeader): Option[BrowserId] =
+    request.cookies.get(BrowserIdCookieName) map { cookie =>
+      BrowserId(cookie.value, isNew = false)
+    }
 
 
   private def createBrowserIdCookie(): (Some[BrowserId], List[Cookie]) = {
@@ -671,7 +674,7 @@ class EdSecurity(globals: Globals) {
     * (If 'fakeIp' is specified, actions.SafeActions.scala copies the value to
     * the dwCoFakeIp cookie.)
     */
-  def realOrFakeIpOf(request: play.api.mvc.Request[_]): String = {
+  def realOrFakeIpOf(request: RequestHeader): String = {
     val fakeIpQueryParam = request.queryString.get("fakeIp").flatMap(_.headOption)
     val fakeIp = fakeIpQueryParam.orElse(
       request.cookies.get("dwCoFakeIp").map(_.value))  getOrElse {
@@ -699,13 +702,13 @@ class EdSecurity(globals: Globals) {
   }
 
 
-  def getE2eTestPassword(request: play.api.mvc.Request[_]): Option[String] =
+  def getE2eTestPassword(request: RequestHeader): Option[String] =
     request.queryString.get("e2eTestPassword").flatMap(_.headOption).orElse(
       request.cookies.get("dwCoE2eTestPassword").map(_.value)).orElse( // dwXxx obsolete. esXxx now
       request.cookies.get("esCoE2eTestPassword").map(_.value))
 
 
-  def hasOkE2eTestPassword(request: play.api.mvc.Request[_]): Boolean = {
+  def hasOkE2eTestPassword(request: RequestHeader): Boolean = {
     getE2eTestPassword(request) match {
       case None => false
       case Some(password) =>
@@ -719,12 +722,12 @@ class EdSecurity(globals: Globals) {
   }
 
 
-  def getForbiddenPassword(request: DebikiRequest[_]): Option[String] =
+  def getForbiddenPassword(request: RequestHeader): Option[String] =
     request.queryString.get("forbiddenPassword").flatMap(_.headOption).orElse(
       request.cookies.get("esCoForbiddenPassword").map(_.value))
 
 
-  def hasOkForbiddenPassword(request: DebikiRequest[_]): Boolean = {
+  def hasOkForbiddenPassword(request: RequestHeader): Boolean = {
     getForbiddenPassword(request) match {
       case None => false
       case Some(password) =>

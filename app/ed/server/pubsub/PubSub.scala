@@ -96,8 +96,8 @@ class PubSubApi(private val actorRef: ActorRef) {
   SHOULD; PRIVACY // change from site id to publ site id [5UKFBQW2].
 
   def userSubscribed(siteId: SiteId, user: Participant, browserIdData: BrowserIdData,
-                     watchedPageIds: Set[PageId]) {
-    actorRef ! UserSubscribed(siteId, user, browserIdData, watchedPageIds)
+                     watchedPageIds: Set[PageId], usersActor: Props) {
+    actorRef ! UserSubscribed(siteId, user, browserIdData, watchedPageIds, usersActor)
   }
 
   def unsubscribeUser(siteId: SiteId, user: Participant, browserIdData: BrowserIdData) {
@@ -142,7 +142,8 @@ private case class UserWatchesPages(
 private case class UserIsActive(
   siteId: SiteId, user: Participant, browserIdData: BrowserIdData)
 private case class UserSubscribed(
-  siteId: SiteId, user: Participant, browserIdData: BrowserIdData, watchedPageIds: Set[PageId])
+  siteId: SiteId, user: Participant, browserIdData: BrowserIdData, watchedPageIds: Set[PageId],
+  usersActor: Props)
 private case class UnsubscribeUser(
   siteId: SiteId, user: Participant, browserIdData: BrowserIdData)
 private case object DeleteInactiveSubscriptions
@@ -217,9 +218,18 @@ class PubSubActor(val nginxHost: String, val globals: Globals) extends Actor {
     case UserIsActive(siteId, user, browserIdData) =>
       publishPresenceIfChanged(siteId, Some(user), Presence.Active)
       redisCacheForSite(siteId).markUserOnlineRemoveStranger(user.id, browserIdData)
-    case UserSubscribed(siteId, user, browserIdData, watchedPageIds) =>
+    case UserSubscribed(siteId, user, browserIdData, watchedPageIds, usersActor: Props) =>
+      // If the user is subscribed already, delete the old WebSocket connection
+      // and use this new one instead. [ONEWSCON]
+      // (If the user is subscribed already — that indicates hen has Ty open in different
+      // browsers? Because each browser should need just one connection: the service
+      // worker's connection. — Keeping DoS attacks in mind, better allow just one
+      // connection per user, for now at least? )
+
+      // .... wip ....
+
       // Mark as subscribed, even if this has been done already, to bump it's timestamp.
-      val anyOldPageIds = addOrUpdateSubscriber(siteId, user, watchedPageIds)
+      val anyOldPageIds = addOrUpdateSubscriber(siteId, user, watchedPageIds, usersActor)
       updateWatcherIdsByPageId(siteId, user.id,
         oldPageIds = anyOldPageIds.getOrElse(Set.empty), watchedPageIds)
       // Don't mark user as online in Redis, and don't publish presence — because these
@@ -264,12 +274,16 @@ class PubSubActor(val nginxHost: String, val globals: Globals) extends Actor {
   }
 
 
-  private def addOrUpdateSubscriber(siteId: SiteId, user: Participant, watchedPageIds: Set[PageId])
+  private def addOrUpdateSubscriber(siteId: SiteId, user: Participant,
+        watchedPageIds: Set[PageId], usersActor: Props)
         : Option[Set[PageId]] = {
     traceLog(siteId, s"Adding/updating subscriber ${prettyUser(user)} [TyDADUPSUBSC]")
     val subscribersById = subscribersByIdForSite(siteId)
     // Remove and reinsert, so inactive users will be the first ones found when iterating.
     val oldEntry = subscribersById.remove(user.id)
+
+    // Put the   usersActor   instead?
+
     subscribersById.put(user.id, UserWhenPages(user, globals.now(), watchedPageIds))
     oldEntry.map(_.watchingPageIds)
   }

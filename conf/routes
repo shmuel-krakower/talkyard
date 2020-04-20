@@ -48,7 +48,7 @@ POST  /-/stop-impersonating     controllers.ImpersonateController.stopImpersonat
 
 GET   /-/pubsub/authorize-subscriber/:channelId  ed.server.pubsub.SubscriberController.authorizeSubscriber(channelId)
 GET   /-/load-online-users                       ed.server.pubsub.SubscriberController.loadOnlineUsers
-GET   /-/websockets              ed.server.pubsub.SubscriberController.socket
+GET   /-/websocket               ed.server.pubsub.SubscriberController.webSocket
 
 GET   /-/embedded-comments      controllers.EmbeddedTopicsController.showTopic(embeddingUrl, discussionId: Option[String], edPageId: Option[String])
 GET   /-/embedded-editor        controllers.EmbeddedTopicsController.showEmbeddedEditor(embeddingUrl, discussionId: Option[String], edPageId: Option[String])

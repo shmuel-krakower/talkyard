@@ -171,7 +171,7 @@ class SitePatchController @Inject()(cc: ControllerComponents, edContext: EdConte
   private def importOverwriteImpl(request: play.api.mvc.Request[_], json: JsValue,
         overwriteSite: Option[Site], isTest: Boolean)
         : Result = {
-    val (browserId, moreNewCookies) = security.getBrowserIdCookieMaybeCreate(request)
+    val (browserId, moreNewCookies) = security.getBrowserIdCreateCookieIfMissing(request)
     val browserIdData = BrowserIdData(ip = request.remoteAddress, idCookie = browserId.map(_.cookieValue),
       fingerprint = 0)
     val response = importSiteImpl(json, browserIdData, overwriteSite, isTest = isTest)

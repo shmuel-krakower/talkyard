@@ -17,38 +17,109 @@
 
 package ed.server.pubsub
 
+import akka.stream.scaladsl.Flow
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp._
 import debiki._
 import ed.server.{EdContext, EdController}
 import ed.server.http._
+import ed.server.security.SidAbsent
 import javax.inject.Inject
-import play.api.libs.json.Json
-import play.api.mvc.{Action, ControllerComponents}
+import play.{api => p}
+import p.libs.json.{JsValue, Json}
+import p.mvc.{Action, ControllerComponents, RequestHeader, Result}
+
+import scala.concurrent.Future
 
 
 /** Authorizes and subscribes a user to pubsub messages.
   */
-class SubscriberController @Inject()(cc: ControllerComponents, edContext: EdContext)
-  extends EdController(cc, edContext) {
+class SubscriberController @Inject()(cc: ControllerComponents, tyCtx: EdContext)
+  extends EdController(cc, tyCtx) {
 
   import context.globals
 
-  import scala.concurrent.Future
-  def socket: play.api.mvc.WebSocket =
-        play.api.mvc.WebSocket.acceptOrResult[String, String] { request =>
+  def webSocket: p.mvc.WebSocket = p.mvc.WebSocket.acceptOrResult[JsValue, JsValue] {
+        request: RequestHeader =>
+    webSocketImpl(request)
+  }
+
+
+  def webSocketImpl(request: RequestHeader)
+        : Future[Either[
+            // Either an error response, if we reject the connection.
+            Result,
+            // Or an In and Out stream, for talking with the client.
+            Flow[JsValue, JsValue, _]]] = {
+    import tyCtx.security
+
+    // A bit dupl code — the same as for normal HTTP requests. [WSHTTPREQ]
+    val site = globals.lookupSiteOrThrow(request)
+    val dao = globals.siteDao(site.id)
+    val expireIdleAfterMins = dao.getWholeSiteSettings().expireIdleAfterMins
+
+    // Eh, hmm, this won't work — there's no xsrf token header.
+    // Use the WebSocket's "protocol" thing, for xsrf token?
+    val (actualSidStatus, xsrfOk, newCookies) =
+      security.checkSidAndXsrfToken(   // throws things — want that?
+        request, anyRequestBody = None, siteId = site.id,
+              expireIdleAfterMins = expireIdleAfterMins, maySetCookies = false)
+
+    val (mendedSidStatus, deleteSidCookie) =
+      if (actualSidStatus.canUse) (actualSidStatus, false)
+      else (SidAbsent, true)
+
+    val anyBrowserId = security.getAnyBrowserId(request)
+    if (anyBrowserId.isEmpty)
+      return Future.successful(Left(
+          ForbiddenResult("TyEWS0BRID", "No browser id")))
+
+
+    dao.perhapsBlockRequest(request, mendedSidStatus, anyBrowserId)
+    val anyRequester: Option[Participant] = dao.getUserBySessionId(mendedSidStatus)
+
+    val requesterMaybeSuspended: Participant = anyRequester getOrElse {
+      return Future.successful(Left(
+        ForbiddenResult("TyEWS0USR", "Not logged in")))
+    }
+
+    if (requesterMaybeSuspended.isDeleted)
+      return Future.successful(Left(
+        ForbiddenResult("TyEWSUSRDLD", "User account deleted")
+          .discardingCookies(security.DiscardingSessionCookie)))  // + discard browser id co too
+
+    val isSuspended = requesterMaybeSuspended.isSuspendedAt(new java.util.Date)
+    if (isSuspended)
+      return Future.successful(Left(
+        ForbiddenResult("TyESUSPENDED_", "Your account has been suspended")
+          .discardingCookies(security.DiscardingSessionCookie)))
+
+    val requester = requesterMaybeSuspended
+
+    // A bit dupl code, see DebikiRequest [WSHTTPREQ]
+    val ip: IpAddress = security.realOrFakeIpOf(request)
+    val browserIdData = BrowserIdData(ip = ip, idCookie = anyBrowserId.map(_.cookieValue),
+      fingerprint = 0) // skip for now
+
+    // If the user is subscribed already, the PubSub actor will delete the old
+    // WebSocket connection and use this new one instead. [ONEWSCON]
     Future.successful(Right(
-      play.api.libs.streams.ActorFlow.actorRef { out =>
-        MyWebSocketActor.props(out)
-      }(edContext.globals.actorSystem, edContext.akkaStreamMaterializer)))
+      p.libs.streams.ActorFlow.actorRef { out: akka.actor.ActorRef =>
+        val requestersActorProps = WebSocketActor.createActorReturnProps(out)
+        val watchbar: BareWatchbar = dao.getOrCreateWatchbar(requester.id)
+        globals.pubSub.userSubscribed(site.id, requester, browserIdData,
+          watchbar.watchedPageIds, requestersActorProps)
+        requestersActorProps
+      }(tyCtx.globals.actorSystem, tyCtx.akkaStreamMaterializer)))
   }
 
-  object MyWebSocketActor {
-    def props(out: akka.actor.ActorRef) = akka.actor.Props(new MyWebSocketActor(out))
+  private object WebSocketActor {
+    def createActorReturnProps(out: akka.actor.ActorRef) =
+      akka.actor.Props(new WebSocketActor(out))
   }
 
-  class MyWebSocketActor(out: akka.actor.ActorRef) extends akka.actor.Actor {
+  private class WebSocketActor(out: akka.actor.ActorRef) extends akka.actor.Actor {
     def receive: PartialFunction[Any, Unit] = {
       case msg: String =>
         out ! ("I received your message: " + msg)
@@ -125,10 +196,12 @@ class SubscriberController @Inject()(cc: ControllerComponents, edContext: EdCont
     // 'siteId-userId' channel id, and in that way subscribe e.g. as someone else at the same site,
     // or someone with the same user id, at a different site.
 
+    /*
     RACE // fairly harmless though. If the user updates the watchbar vi another browser tab right now.
     val watchbar: BareWatchbar = request.dao.getOrCreateWatchbar(request.theUser.id)
     globals.pubSub.userSubscribed(request.siteId, request.theUser, request.theBrowserIdData,
       watchbar.watchedPageIds)
+     */
     Ok
   }
 
