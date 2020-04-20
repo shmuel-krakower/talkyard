@@ -35,6 +35,34 @@ class SubscriberController @Inject()(cc: ControllerComponents, edContext: EdCont
 
   import context.globals
 
+  import scala.concurrent.Future
+  def socket: play.api.mvc.WebSocket =
+        play.api.mvc.WebSocket.acceptOrResult[String, String] { request =>
+    Future.successful(Right(
+      play.api.libs.streams.ActorFlow.actorRef { out =>
+        MyWebSocketActor.props(out)
+      }(edContext.globals.actorSystem, edContext.akkaStreamMaterializer)))
+  }
+
+  object MyWebSocketActor {
+    def props(out: akka.actor.ActorRef) = akka.actor.Props(new MyWebSocketActor(out))
+  }
+
+  class MyWebSocketActor(out: akka.actor.ActorRef) extends akka.actor.Actor {
+    def receive: PartialFunction[Any, Unit] = {
+      case msg: String =>
+        out ! ("I received your message: " + msg)
+    }
+  }
+  
+  /*
+  let ws = new WebSocket('ws://site-3.localhost/-/websockets');
+    ws.onmessage = function(event) {
+      const message = JSON.parse(event.data)
+      console.log(JSON.stringify(message, undefined, 2));
+    }
+   */
+
   /** This request is sent by Nchan to the app server's ip address so we don't know which site
     * it concerns (because the normal functionality that looks at the hostname doesn't work,
     * since Nchan sends to the ip address, not the correct hostname).
