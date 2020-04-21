@@ -17,7 +17,7 @@
 
 package ed.server.pubsub
 
-import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp._
@@ -53,6 +53,23 @@ class SubscriberController @Inject()(cc: ControllerComponents, tyCtx: EdContext)
             // Or an In and Out stream, for talking with the client.
             Flow[JsValue, JsValue, _]]] = {
     import tyCtx.security
+
+    val in = Sink.foreach[String](println)
+    val in = Sink.onComplete(_ => println("WS connection gone"))
+
+    Future.successful(Right(
+      Flow.fromSinkAndSource(in, out)
+      p.libs.streams.ActorFlow.actorRef { out: akka.actor.ActorRef =>
+        val queue = Source
+          .queue[Int](bufferSize = 100, akka.stream.OverflowStrategy.backpressure)
+          // .throttle(elementsToProcess, 3.second)
+          //.map(x => x * x)
+          .toMat(Sink.foreach { x =>
+            println(s"completed $x")
+            out ! x
+          })(Keep.left)
+          .run()(tyCtx.akkaStreamMaterializer)
+    }(tyCtx.globals.actorSystem, tyCtx.akkaStreamMaterializer)))
 
     // A bit dupl code — the same as for normal HTTP requests. [WSHTTPREQ]
     val site = globals.lookupSiteOrThrow(request)
