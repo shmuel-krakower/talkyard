@@ -8,7 +8,7 @@ resolvers += "Typesafe repository" at "https://repo.typesafe.com/typesafe/releas
 //resolvers += Resolver.file("Local Repository", file("/mnt/data/dev/play/github2/repository/local"))(Resolver.ivyStylePatterns)
 
 // Play SBT Plugin:
-//resolvers += Resolver.url("Typesafe Ivy Snapshots", url("http://repo.typesafe.com/typesafe/ivy-snapshots/"))(Resolver.ivyStylePatterns)
+//resolvers += Resolver.url("Typesafe Ivy Snapshots", url("https://repo.typesafe.com/typesafe/ivy-snapshots/"))(Resolver.ivyStylePatterns)
 
 resolvers ++= Seq(
   // For Specs2:
@@ -18,7 +18,6 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")) // =  https://repo.scala-sbt.org/scalasbt/sbt-plugin-releases/
 
 // Use the Play sbt plugin for Play projects
-//addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.6.25")    // newest 6x, as of 20-02-27,
 addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.8.1")
 
 

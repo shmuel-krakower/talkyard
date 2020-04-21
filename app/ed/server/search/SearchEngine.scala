@@ -30,14 +30,12 @@ import org.{elasticsearch => es}
 import org.scalactic.{Bad, Good}
 import scala.collection.immutable
 import scala.concurrent.{Future, Promise}
-import talkyard.server.TyLogger
+import talkyard.server.TyLogging
 
 
 class SearchEngine(
   private val siteId: SiteId,
-  private val elasticSearchClient: Client) {
-
-  private val logger = TyLogger("Debiki")
+  private val elasticSearchClient: Client) extends TyLogging {
 
   def search(searchQuery: SearchQuery, anyRootPageId: Option[String], user: Option[Participant],
         addMarkTagClasses: Boolean)

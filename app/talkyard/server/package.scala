@@ -2,7 +2,7 @@ package talkyard
 
 import com.debiki.core._
 
-package object server extends play.api.Logging {
+package object server {
 
   val ProdConfFilePath = "/opt/talkyard/conf/play-framework.conf"
 

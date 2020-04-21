@@ -129,7 +129,7 @@ class EdSecurity(globals: Globals) {
 
   import EdHttp._
 
-  private lazy val logger = TyLogger("TySecurity")
+  private val logger = TyLogger("TySecurity")
 
   private val XsrfTokenInputName = "dw-fi-xsrf"
 

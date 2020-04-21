@@ -48,9 +48,10 @@ import ed.server.EdContext
 import ed.server.http.GetRequest
 import ed.server.jobs.Janitor
 import play.api.mvc.RequestHeader
+import talkyard.server.TyLogging
 
 
-object Globals extends play.api.Logging {
+object Globals extends TyLogging {
 
   class NoStateError extends AssertionError(
     "No Globals.State created, please call onServerStartup() [DwE5NOS0]")
@@ -105,7 +106,7 @@ class Globals(
   val executionContext: scala.concurrent.ExecutionContext,
   val wsClient: WSClient,
   val actorSystem: ActorSystem,
-  val tracer: io.opentracing.Tracer) extends play.api.Logging {
+  val tracer: io.opentracing.Tracer) extends TyLogging {
 
   def outer: Globals = this
 
@@ -128,20 +129,20 @@ class Globals(
   val config = new Config(conf)
 
   // Dupl [305926XFG24] -------------------
-  private def getBoolOrFalse(confValueName: String): Boolean =
-    conf.getOptional[Boolean](confValueName) getOrElse false
+  private def getBoolOrFalse(confValName: String): Boolean =
+    getBoolOrDefault(confValName, default = false)
 
   private def getIntOrDefault(confName: String, default: Int): Int =
     conf.getOptional[Int](confName) getOrElse default
 
-  private def getBoolOrDefault[A](confName: String, default: Boolean): Boolean =
+  private def getBoolOrDefault(confName: String, default: Boolean): Boolean =
     conf.getOptional[Boolean](confName) getOrElse default
 
-  private def getStringOrEmpty[A](confName: String): String =
-    conf.getOptional[String](confName) getOrElse ""
-
-  private def getStringOrDefault[A](confName: String, default: String): String =
-    conf.getOptional[String](confName).trimNoneIfBlank getOrElse default
+  // private def getStringOrEmpty[A](confName: String): String =
+  //   getStringOrDefault(confName, "")
+  //
+  //private def getStringOrDefault[A](confName: String, default: String): String =
+  //  conf.getOptional[String](confName).trimNoneIfBlank getOrElse default
 
   private def getStringNoneIfBlank[A](confName: String): Option[String] =
     conf.getOptional[String](confName).noneIfBlank
@@ -154,6 +155,8 @@ class Globals(
   val isOrWasTest: Boolean = appLoaderContext.environment.mode == play.api.Mode.Test
   val isProd: Boolean = Globals.isProd
 
+  // This helps with shutting down when running tests — might not work properly now
+  // with Play 2.8 but seems the test shutdown properly anyway.
   def testsDoneServerGone: Boolean =
     isOrWasTest && (!isInitialized )  // [PLAY28] ?? || Play.maybeApplication.isEmpty)
 
@@ -1110,7 +1113,7 @@ object Config {
 }
 
 
-class Config(conf: play.api.Configuration) extends play.api.Logging {
+class Config(conf: play.api.Configuration) extends TyLogging {
 
   import Globals._
 
@@ -1118,13 +1121,13 @@ class Config(conf: play.api.Configuration) extends play.api.Logging {
   private def getIntOrDefault(confName: String, default: Int): Int =
     conf.getOptional[Int](confName) getOrElse default
 
-  private def getBoolOrDefault[A](confName: String, default: Boolean): Boolean =
+  private def getBoolOrDefault(confName: String, default: Boolean): Boolean =
     conf.getOptional[Boolean](confName) getOrElse default
 
-  private def getStringOrEmpty[A](confName: String): String =
-    conf.getOptional[String](confName) getOrElse ""
+  private def getStringOrEmpty(confName: String): String =
+    getStringOrDefault(confName, "")
 
-  private def getStringOrDefault[A](confName: String, default: String): String =
+  private def getStringOrDefault(confName: String, default: String): String =
     conf.getOptional[String](confName).trimNoneIfBlank getOrElse default
   // --------------------------------------
 

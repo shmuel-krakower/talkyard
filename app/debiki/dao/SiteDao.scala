@@ -122,9 +122,7 @@ class SiteDao(
   with FeedsDao
   with AuditDao {
 
-  // Backw compat w Play 2.6, to save time when upgrading to 2.8.
-  def logger = TyLogger("SiteDao")
-  def Logger = logger
+  protected lazy val logger: play.api.Logger = TyLogger("SiteDao")
 
   // Could be protected instead? Then need to move parts of ApiV0Controller to inside the Dao.
   lazy val memCache = new MemCache(siteId, cache, globals.mostMetrics)

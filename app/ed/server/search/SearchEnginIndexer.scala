@@ -26,7 +26,7 @@ import org.elasticsearch.action.index.{IndexRequestBuilder, IndexResponse}
 import org.{elasticsearch => es}
 import scala.concurrent.duration._
 import Prelude._
-import talkyard.server.TyLogger
+import talkyard.server.{TyLogger, TyLogging}
 import org.elasticsearch.common.xcontent.XContentType
 import org.postgresql.util.PSQLException
 import scala.concurrent.ExecutionContext
@@ -38,7 +38,7 @@ import scala.concurrent.ExecutionContext
   * avoid indexing stuff, or even the same thing, too frequently.
   * Because frequent updates should be avoided, see link [30G23] in package.scala.
   */
-object SearchEngineIndexer {
+object SearchEngineIndexer extends TyLogging {
 
   def startNewActor(indexerBatchSize: Int, intervalSeconds: Int,
         executionContext: ExecutionContext,

@@ -23,12 +23,11 @@ import java.{io => jio}
 import javax.{script => js}
 import debiki.onebox.{InstantOneboxRendererForNashorn, Onebox}
 import org.apache.lucene.util.IOUtils
-import play.api.Play
 import scala.concurrent.Future
-import scala.util.Try
 import Nashorn._
 import jdk.nashorn.api.scripting.ScriptObjectMirror
 import org.scalactic.{Bad, ErrorMessage, Good, Or}
+import talkyard.server.TyLogging
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -53,7 +52,7 @@ case class RenderCommonmarkResult(safeHtml: String, mentions: Set[String])
   */
 class Nashorn(
   // CLEAN_UP don't expose. Barely matters.
-  val globals: Globals) extends play.api.Logging {
+  val globals: Globals) extends TyLogging {
 
   /** The Nashorn Javascript engine isn't thread safe.  */
   private val javascriptEngines =
@@ -147,16 +146,16 @@ class Nashorn(
       case throwable: Throwable =>
         if (// [PLAY28] ?? Play.maybeApplication.isEmpty ||
             throwable.isInstanceOf[Globals.NoStateError]) {
-          /* [PLAY28] ??
           if (!Globals.isProd) {
-            logger.debug("Server gone, tests done? Cancelling script engine creation. [EsM6MK4]")
+            logger.debug(
+              "Server gone, tests done? Fine, cancelling script engine creation. [TyM6MK4]")
           }
-          else { */
-            logger.error("Error creating Javascript engine: No server [EsE6JY22]", throwable)
-          //}
+          else {
+            logger.error("Error creating Javascript engine: No server [TyE6JY22]", throwable)
+          }
         }
         else if (isVeryFirstEngine) {
-          logger.error("Error creating the very first Javascript engine: [DwE6KG25Z]", throwable)
+          logger.error("Error creating the very first Javascript engine: [TyE6KG25Z]", throwable)
           firstCreateEngineError = Some(throwable)
           javascriptEngines.putLast(BrokenEngine)
           die("DwE5KEF50", "Broken server side Javascript, this won't work")

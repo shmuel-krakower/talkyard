@@ -635,12 +635,13 @@ object Prelude {
 
   implicit class BlankStringToNone(underlying: Option[String]) {
     def noneIfBlank: Option[String] =
-      if (underlying.exists(_.trim.isEmpty)) None else underlying
-    // But this is the same as above is it not:
+      if (underlying.exists(_.trim.isEmpty)) None
+      else underlying  // <—— not trimmed
+
     def trimNoneIfBlank: Option[String] =
       underlying.map(_.trim) match {
         case Some("") => None
-        case x => x
+        case x => x  // <—— trimmed
       }
 
     def isEmptyOrContainsBlank: Boolean =

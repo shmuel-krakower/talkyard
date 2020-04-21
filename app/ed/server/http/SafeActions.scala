@@ -81,6 +81,7 @@ class SafeActions(val globals: Globals, val security: EdSecurity, parsers: PlayB
    * instead of 500 Internal Server Error and a stack trace or Ooops message.
    */
   object ExceptionAction extends ActionBuilder[Request, AnyContent] {
+    SECURITY // stop using ExceptionAction at most places — change to PlainApiActionImpl + rate limits
 
     val parser: BodyParser[AnyContent] = parsers.anyContent  // [play26ask]
 
